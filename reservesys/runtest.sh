@@ -242,3 +242,12 @@ RprtRslt $TEST PASS 0
 
 # stop rhts service, So that reserve workflow works with test reboot support.
 STOPRHTS
+
+# harnesses other than beah may cause this script to nominally fail (e.g.
+# failing to stop rhts, since other harnesses may not have such a thing),
+# so we force the script to always return zero
+#
+# this means that including /distribution/reservesys in a recipe should
+# never change the overall result, even if helper commands that assume beah
+# as the harness fail
+exit 0
