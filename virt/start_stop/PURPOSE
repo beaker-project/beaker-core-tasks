@@ -1,0 +1,15 @@
+This test is for starting/stopping virtual guest in a virtual workflow. It can
+be called with no test arguments at all in which case it'll go thru each and
+every guest defined in the test thru guestrecipes and will start and stop them
+in order. 
+Optional arguments are GUESTSTARTSTOP_ARGS and VIRTEST_TIMEOUT .
+GUESTSTARTSTOP_ARGS argument can be used to specify which guests are needed to
+be started/stopped. For most, this is not needed to be provided because the
+test, by default, with start and stop each and every guest. VIRTEST_TIMEOUT
+argument is used to specify the timeout to wait how long it takes the guest to
+start or stop. Note that, when the guest starts, it does run every beaker test
+specified in the guest recipe as part of the init process, so this should be
+taken into the account. If this argument is not provided, then there will be no
+timeout.
+
+For most cases neither one of the arguments should be needed. 

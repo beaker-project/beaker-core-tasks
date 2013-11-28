@@ -1,0 +1,68 @@
+#!/usr/bin/expect
+#
+# utility script to start the guest and make sure that it started is up
+# it has a default of 5 minutes to wait for the guest to start up.
+#
+
+#exp_internal 1 
+
+if { $argc < 1 } {
+	send_user "Usage: $argv0 guestname <optional timeout value>"
+	exit 1
+}
+
+# stupid hack for when this is called from a script
+if { $argc == 1 } {
+	set argv_tmp [lindex $argv 0]
+	set argv [split $argv_tmp]
+}
+
+if { [llength $argv] > 1 } {
+	set waittimeout [lindex $argv 1]
+} else {
+	set waittimeout 300
+}
+
+set guest  [lindex $argv 0]
+set prompt "(%|#|\\\$) $" 
+log_user 0
+
+spawn virsh start $guest
+set start_spawn $spawn_id
+expect {
+	-i $start_spawn "Domain $guest started" { }
+	-i $start_spawn timeout { 
+		send_user "timeout on virsh start $guest\n"; 
+		exit 1; 
+	}
+	-i $start_spawn eof { 
+		send_user "Unexpected EOF on starting $guest \n";
+		exit 1;
+	}
+}
+
+sleep 15
+set timeout $waittimeout
+spawn virsh console $guest
+set con_spawn $spawn_id
+send -i $con_spawn "\n"
+send -i $con_spawn "\n"
+send -i $con_spawn "\n"
+expect {
+	-i $con_spawn "Press any key to continue" { send -i $con_spawn "\n"; exp_continue; }
+	-i $con_spawn "Press enter" {sleep 5 ;  send -i $con_spawn "\n"; exp_continue; }
+	-i $con_spawn "The highlighted entry will be booted automatically in" { exp_continue; }
+	-i $con_spawn -exact {[  OK  ]} { exp_continue; }
+	-i $con_spawn "login:" { send -i $con_spawn "\n";send -i $con_spawn ; exit 0; }
+	-i $con_spawn -re "(P|p)assword:" { send -i $con_spawn "\n";send -i $con_spawn ; exit 0; }
+	-i $con_spawn timeout { 
+		send_user "start timeout\n"; 
+		exit 1;
+	 }
+	-i $con_spawn eof { 
+		send_user "start EOF\n"; 
+		exit 1; 
+	}
+}
+
+exit 1;
