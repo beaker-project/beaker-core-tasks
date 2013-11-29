@@ -68,7 +68,7 @@ $(METADATA): Makefile
 	@echo "Owner:        Bill Peck <bpeck@redhat.com>" > $(METADATA)
 	@echo "Name:         $(TEST)" >> $(METADATA)
 	@echo "Path:         $(TEST_DIR)"	>> $(METADATA)
-	@echo "License:      GPL" >> $(METADATA)
+	@echo "License:      GPLv2+" >> $(METADATA)
 	@echo "TestVersion:  $(TESTVERSION)"	>> $(METADATA)
 	@echo "Description:  Verifies a distro installs">> $(METADATA)
 	@echo "TestTime:     5m" >> $(METADATA)

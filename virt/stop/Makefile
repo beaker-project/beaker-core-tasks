@@ -40,4 +40,4 @@ $(METADATA):
 	@echo "TestTime:	7200"		>> $(METADATA)
 	@echo "Architectures:	i386 x86_64 ia64" >> $(METADATA)
 	@echo "Priority:	Manual"		>> $(METADATA)
-	@echo "License:		GPLv2" >> $(METADATA)
+	@echo "License:		GPLv2+" >> $(METADATA)

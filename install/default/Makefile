@@ -71,4 +71,4 @@ $(METADATA): Makefile
 	@echo "Requires:	libxml2-python" 	>> $(METADATA)
 	@echo "Requires:	expect" 		>> $(METADATA)
 	@echo "Requires:	pyOpenSSL"		>> $(METADATA)
-	@echo "License:		GPL"			>> $(METADATA)
+	@echo "License:		GPLv2+"			>> $(METADATA)
