@@ -4,8 +4,8 @@ controller when the job has guestrecipe . This testis required to install the
 guest machines defined in the guestrecipes.
 
 For more information on how to write and execute virtualization testcases refer
-to the Virtualization workflow information on RHTS wiki page which is linked on
-the homepage of RHTS.
+to the Virtualization workflow information in Beaker's documentation:
+    http://beaker-project.org/docs/user-guide/virtualization-workflow.html
 
 Guest console logs:
 For RHEL5 hypervisors, the guest console forwarding will be set up, unless the
@@ -23,8 +23,6 @@ purpose, and they are:
     filetopty.sh: cancel out the file forwarding and free up the console of the
 guest, so that one can connect it via "virsh console $guestname"
     ptytofile.sh: The reverse of above. 
-These files are provided in the /distribution/virt/utils tests which is a
-requirement for this test.
 
 For the guests in rhel6 hosts, we had forwarded the serial console
 to a file output, but that had blocked the console access and required manual
@@ -52,9 +50,8 @@ So for this instance you'd do :
 
 One caveat is that, we have rhts-compat service that's run and started up by
 beah, which grabs the console so the console i/o is garbled and unusable. To
-mitigate this, I have created a job in beaker, that you can put in your guests
-after /distribution/install to turn it off. The task is :
-   /distribution/utils/rhts_compat_off 
+mitigate this, add a task in your guest recipes after /distribution/install to
+stop and disable the rhts-compat service.
 If you are doing this manually, you can reboot the guest in single mode and
 disable the service yourself using the console. 
 
@@ -77,9 +74,8 @@ and you should be in the guest.
 ===============================================================================
 Test execution synchronization between the guests and hypervisor..
 In the case of a need to wait some specific tasks in a guest to execute before
-running some tasks in the hypervisor, wait4guesttasks script, provided in the
-/distribution/virt/utils package can be used. For more information refer to the
-script itself. 
+running some tasks in the hypervisor, wait4guesttasks script, provided in this
+task, can be used. For more information refer to the script itself.
 
 
 
