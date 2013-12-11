@@ -82,7 +82,7 @@ include /usr/share/rhts/lib/rhts-make.include
 # Generate the testinfo.desc here:
 $(METADATA):
 	@touch $(METADATA)
-	@echo "Owner:		Kernel QE team <kernel-qe@redhat.com>" > $(METADATA)
+	@echo "Owner:           Beaker Developers <beaker-devel@lists.fedorahosted.org>" > $(METADATA)
 	@echo "Name:		$(TEST)"	>> $(METADATA)
 	@echo "Path:		$(TEST_DIR)"	>> $(METADATA)
 	@echo "TestVersion:	$(TESTVERSION)"	>> $(METADATA)

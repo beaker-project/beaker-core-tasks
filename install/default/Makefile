@@ -49,7 +49,7 @@ run: build
 # Generate the testinfo.desc(METADATA) here:
 $(METADATA): Makefile
 	@touch $(METADATA)
-	@echo "Owner:		Bill Peck <bpeck@redhat.com>" > $(METADATA)
+	@echo "Owner:           Beaker Developers <beaker-devel@lists.fedorahosted.org>" > $(METADATA)
 	@echo "Name:		$(TEST)"	>> $(METADATA)
 	@echo "Path:		$(TEST_DIR)"	>> $(METADATA)
 	@echo "TestVersion:	$(TESTVERSION)"	>> $(METADATA)
@@ -71,4 +71,4 @@ $(METADATA): Makefile
 	@echo "Requires:	libxml2-python" 	>> $(METADATA)
 	@echo "Requires:	expect" 		>> $(METADATA)
 	@echo "Requires:	pyOpenSSL"		>> $(METADATA)
-	@echo "License:		GPL"			>> $(METADATA)
+	@echo "License:		GPLv2+"			>> $(METADATA)

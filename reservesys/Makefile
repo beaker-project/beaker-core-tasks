@@ -35,7 +35,7 @@ run: build
 # Generate the testinfo.desc here:
 $(METADATA): Makefile
 	@touch $(METADATA)
-	@echo "Owner:		Bill Peck <bpeck@redhat.com>" > $(METADATA)
+	@echo "Owner:           Beaker Developers <beaker-devel@lists.fedorahosted.org>" > $(METADATA)
 	@echo "Name:		$(TEST)"		>> $(METADATA)
 	@echo "Path:		$(TEST_DIR)"		>> $(METADATA)
 	@echo "TestVersion:	$(TESTVERSION)"		>> $(METADATA)
@@ -47,5 +47,5 @@ $(METADATA): Makefile
 	@echo "Requires:	unifdef"		>> $(METADATA)
 	@echo "Requires:	sendmail"		>> $(METADATA)
 	@echo "Requires:	psmisc" 		>> $(METADATA)
-	@echo "License:		GPLv2"	                >> $(METADATA)
+	@echo "License:		GPLv2+"	                >> $(METADATA)
 	@echo "RhtsOptions:	-Compatible -CompatService"	>> $(METADATA)

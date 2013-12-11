@@ -65,10 +65,10 @@ include /usr/share/rhts/lib/rhts-make.include
 $(METADATA): Makefile
 	@touch $(METADATA)
 # Change to the test owner's name
-	@echo "Owner:        Bill Peck <bpeck@redhat.com>" > $(METADATA)
+	@echo "Owner:        Beaker Developers <beaker-devel@lists.fedorahosted.org>" > $(METADATA)
 	@echo "Name:         $(TEST)" >> $(METADATA)
 	@echo "Path:         $(TEST_DIR)"	>> $(METADATA)
-	@echo "License:      GPL" >> $(METADATA)
+	@echo "License:      GPLv2+" >> $(METADATA)
 	@echo "TestVersion:  $(TESTVERSION)"	>> $(METADATA)
 	@echo "Description:  Verifies a distro installs">> $(METADATA)
 	@echo "TestTime:     5m" >> $(METADATA)

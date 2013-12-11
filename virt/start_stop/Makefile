@@ -33,7 +33,7 @@ include /usr/share/rhts/lib/rhts-make.include
 # Generate the testinfo.desc here:
 $(METADATA):
 	@touch $(METADATA)
-	@echo "Owner:		Kernel QE team <kernelqe@redhat.com>" > $(METADATA)
+	@echo "Owner:           Beaker Developers <beaker-devel@lists.fedorahosted.org>" > $(METADATA)
 	@echo "Name:		$(TEST)"	>> $(METADATA)
 	@echo "Path:		$(TEST_DIR)"	>> $(METADATA)
 	@echo "TestVersion:	$(TESTVERSION)"	>> $(METADATA)
@@ -41,4 +41,4 @@ $(METADATA):
 	@echo "TestTime:	7200"		>> $(METADATA)
 	@echo "Architectures:	i386 x86_64 ia64" >> $(METADATA)
 	@echo "Priority:	Manual"		>> $(METADATA)
-	@echo "License:		GPLv2" >> $(METADATA)
+	@echo "License:		GPLv2+" >> $(METADATA)
