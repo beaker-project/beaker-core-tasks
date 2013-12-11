@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+# a stupid script to determine is we're running on kvm or not
+# returns zero if it's, non-zero if it's not
+#
+
+if lsmod | grep -q kvm; then 
+	exit 0
+else 
+	exit 1
+fi

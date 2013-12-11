@@ -1,0 +1,1144 @@
+#!/usr/bin/expect
+
+# script to install guests.
+# uses virsh or xm
+
+#when debugging:
+#exp_internal 1
+#log_user 0
+## another stupid horrific hack..
+if { $argc == 1 } {
+   set argv_tmp [lindex $argv 0]
+   set argv [split $argv_tmp]
+}
+set argv_len [llength $argv]
+# set timeout to an hour
+set timeout 36000
+
+#global vars.
+set prompt        "(%|#|\\\$) $"
+set hostname      [exec hostname]
+set ksfile           ""
+set arch             ""
+set installbackend   "file"
+set vnc              0
+set nographs         0
+set noreboot         0
+set hv               0
+set pv               0
+set ks               0
+set rhel3hvmguest    0
+set rhtsdebug        0
+set diskidx          0
+set fileidx          0
+set extra_args       ""
+set kslocation       ""
+set guest_crash      0
+set guest_inst_error 0
+set mdadm_workaround 0
+set boot_xml         0
+set noloc            1
+set ver6             0
+set serial_device    0
+set graphicsgiven    0
+#find out the type of the hypervisor.
+if { [file exists /sys/hypervisor/type ] } {
+  set hvisor [exec cat /sys/hypervisor/type]
+} else {
+  set hvisor "kvm" 
+}
+
+if { $hvisor == "xen" } {
+	set image_dir "/var/lib/xen/images"
+	set isodir    "/var/lib/xen/images"
+} elseif { $hvisor == "kvm" } {
+	set image_dir "/var/lib/libvirt/images"
+	set isodir    "/var/lib/libvirt/images"
+} else {
+	send_user "I don't know about $hvisor hypervisor\n"
+	exit 1
+}
+
+
+
+#pre-install error codes
+set preinst_error(syntax) 10
+set preinst_error(setup)  11
+
+set exit_code(success)     0
+set exit_code(warn)        1
+#install error codes
+set install_error(setup)   30
+set install_error(syntax)  31
+set install_error(vnc)     32
+set install_error(libvirt) 33
+set install_error(eof)     34
+set install_error(timeout) 35
+set install_error(error)   36
+set install_error(crash)   37
+set install_error(nohvmsupported) 38
+
+#error codes after install
+set postinst_error(shutdown) 50
+set postinst_error(connect)  51
+set postinst_error(setup)    52
+set postinst_error(error)    52
+
+
+## the hashes for the commands:
+set cmd "virsh" ; # can be either xm or virsh
+##common  args
+set virtcmd(list)     "list"
+set virtcmd(shutdown) "shutdown"
+set virtcmd(reboot)   "reboot"
+set virtcmd(destroy)  "destroy"
+set virtcmd(save)     "save"
+set virtcmd(restore)  "restore"
+
+if { $cmd == "xm" } {
+	set virtcmd(start)   "create"
+	set virtcmd(connect) "console"	
+	set virtcmd(suspend) "undefined"
+
+} elseif { $cmd == "virsh" } {
+	set virtcmd(start)   "start"
+	set virtcmd(connect) "connect"
+	set virtcmd(suspend) "suspend"
+} else {
+	send_user "Please use either xm or virsh as your program"
+	exit $preinst_error(setup)
+}
+
+set virtcmd(save)      "save"
+set virtcmd(setmem)    "setmem"
+set virtcmd(setmaxmem) "setmaxmem"
+set virtcmd(version)   "version"
+
+# process command line arguments.
+for  {set i 0} { $i < 51 } {incr i} {
+	set cmdstr($i) " "
+}
+ 
+# proc to comment out the mount point from the /etc/fstab file. 
+# this is needed when there are partition and/or lvm based guests, 
+# the partitions or volumes are not unmounted permanently by umount 
+# command so if, after the install, the host is rebooted for whatever reason,
+# for example as part of a later install, then the boot is having issues 
+# 
+proc update_fstab { mnt } {
+	set file "/etc/fstab"
+	send_user "disabling $mnt in $file ..\n"
+
+	set fd_i [open $file]
+	set contents [read $fd_i]
+	close $fd_i
+
+	set fd_o [open $file w]
+	set records [split $contents "\n" ]
+
+	foreach line $records {
+		# see if the mountpoint exists
+        	set linelist [regexp -inline -all -- {\S+} $line ]
+        	set mntpt [lindex $linelist 1]
+        	if { [string compare $mnt $mntpt] == 0 } {
+			set cmt "#"
+			set line $cmt$line
+		}
+		puts $fd_o $line
+	}
+	close $fd_o
+} ; #end of update_fstab
+
+# proc to create temp directory to work on, such as creating an iso with the
+# desired KS for hvm installs
+proc mkdtemp {directory} {
+	
+	upvar #0 $directory dirname
+	set tmpnum [expr int( rand()*10000 )]
+	set dirname "tmp.$tmpnum"
+
+	send_user "dirname is: $dirname \n";
+
+	if { [ file exists $dirname ] } {
+		return 1;
+	} 
+
+	if { [ catch {exec mkdir ./$dirname} result ] } {
+		return 1;
+	}
+
+	#success
+	return 0;
+}; #end of mkdtemp
+
+# this proc creates a KS file from the templates, if not given one by the user
+proc getKSfile { {tmpdir ""} } {
+	global hostname;
+	global guestname;
+	global location;
+	global kslocation;
+	global ksfile;
+	global preinst_error;
+	global rhel3hvmguest;
+	global rhtsdebug;
+	
+	### if we are in rhts, we shouldn't be here for pv installations since it always 
+	# passes on a kickstart file. For hvm installations though, we just need to copy 
+	# the kickstart file given to us into the directory...
+	if { $::pv } {
+		send_user "Error! RHTS should give us a kickstart file! \n";
+		exit $preinst_error(setup);
+	}
+	# disabling the block below since we won't need it anymore..
+	if { $::hv == 10 } {
+		if { [string length $kslocation] == 0 || [string length $ksfile] == 0 } {
+			send_user "Sorry, no KS file is given.. we need one... \n";
+			exit $preinst_error(syntax);
+		}
+		if { [catch {exec wget -q $kslocation -O ./$ksfile } result]} {
+			send_user "Problem with  wget -q $kslocation -O ./$ksfile \n"
+			send_user " $result "
+			exit $preinst_error(setup);
+		}
+		# for hvm guests, we should append serial console info to the
+		# bootloader so that we can connect to guest's serial console. 
+		set fd_i [open ./$ksfile  ]
+		set fd_o [open ./${ksfile}.tmp w+  ]
+		while {[gets $fd_i line] >= 0} {
+			if { [regexp ^bootloader.* $line] } {
+				# rhts hacks here... we have noapic workaround for rhel3 guests
+				if { $rhel3hvmguest && !$rhtsdebug } {
+					puts $fd_o "$line --append=\"noapic console=tty0 console=ttyS0,115200\""
+				} elseif { $rhel3hvmguest && $rhtsdebug } {
+					puts $fd_o "$line --append=\"noapic\""
+				} elseif { $rhtsdebug } {
+					puts $fd_o "$line"
+				} else {
+					puts $fd_o "$line --append=\"console=tty0 console=ttyS0,115200\""
+				}
+			} else {
+				puts $fd_o $line
+    			}
+		}
+		close $fd_i
+		close $fd_o
+	 		
+		if { [catch {exec mv ./${ksfile}.tmp ${tmpdir}/${ksfile} } result]} {
+			send_user "Problem with mv ./${ksfile}.tmp ${tmpdir}/${ksfile}  \n"
+			send_user " $result "
+			exit $preinst_error(setup);
+		}
+		return
+	}
+
+}
+
+#the following 3 procs are to take care of the cmdstr array.. Used to just set
+#the array to empty strings and give it as args but virt-install is no longer
+#taking them as they are..
+# See: BZ#675753
+proc moveelsinarray { arr idx gap } {
+        upvar 1 $arr myarr
+        set arr_size [expr [array size myarr] - 1]
+
+        #puts "size : $arr_size , idx: $idx gap: $gap "
+        for {set i $idx} {$i <= $arr_size} {incr i } {
+                if { [expr $i + $gap] > $arr_size } {
+                        set myarr($i) ""
+                        #puts "setting myarr($i) to nothing"
+                        continue
+                }
+                set myarr($i) $myarr([expr $i + $gap])
+        #       puts "setting myarr($i) to $myarr($i) "
+        }
+}
+proc pruneels { arr idx cur_idx} {
+        upvar 1 $arr myarr
+        upvar 1 $cur_idx my_cur_idx
+        set rotated 0
+        set size [array size myarr]
+        if { $idx == [expr $size - 1] } {
+                return 0
+        }
+        for { set i $idx} { $i < [expr $size - 1] } { incr i } {
+                if { [string trim $myarr($i)] == "" } {
+                        set skip 1
+                        set my_cur_idx $i
+                        set gap_idx $i
+        #               puts "i in the first one is : $i "
+                        while { [expr $gap_idx+1 < $size] && [string trim $myarr([expr $gap_idx+1]) ] == "" } {
+                                incr skip
+                                incr gap_idx
+                        }
+        #               puts "i in the second one is : $i "
+                        moveelsinarray myarr $i $skip
+
+                }
+        }
+        if { $i < [expr $size - 1] } {
+                pruneels myarr $i $my_cur_idx
+        }
+}
+
+proc returnfirstel { arr } {
+
+    upvar 1 $arr myarr
+    set size [ array size myarr]
+    set retstr ""
+    for { set i 0 } { $i < $size } { incr i } {
+        if { [string trim $myarr($i)] != "" } {
+            # escape all parameters which contain space
+            set tmp "$myarr($i)"
+            if { [string match "* *" "$tmp"] } {
+                set tmp "\"$tmp\""
+            }
+            set retstr "$retstr $tmp"
+        } else {
+            break
+        }
+    }
+    return $retstr
+}
+
+
+
+
+## parse the command line args for the stuff we need and we need to
+# modify
+# not that it'll also look for PKGARGNAME env variable in case no arguments
+# are given ..
+
+#if { $argv_len < 9 && [info exists env(PKGARGNAME)] } {
+#	set argv [split $env(PKGARGNAME)];
+#	set argv_len [llength $argv]
+#}
+
+# prune out any empty elements in the list 
+set argv [lsearch -all -inline -not -exact $argv {}]
+for {set i 0} { $i < $argv_len } {incr i} {
+
+	set cmdstr($i) [lindex $argv $i] ;
+	if { $cmdstr($i) == "--vnc" } {
+		set vnc 1;
+	} elseif { $cmdstr($i) == "--graphics" } {
+		set graphicsgiven 1;
+	} elseif { $cmdstr($i) == "--nographics" } {
+		set nographs 1;
+	} elseif { $cmdstr($i) == "--noreboot" } {
+		set noreboot 1;
+        } elseif { $cmdstr($i) == "-n" ||  $cmdstr($i) == "--name" } {
+		set guestname [lindex $argv [expr $i + 1]]
+		if { [catch {exec mkdir -p ./guests/${guestname}/logs} errStr ] } {
+			send_user "Error creating dir ./guests/${guestname}/logs: \n"
+			send_user "$errStr \n";
+		}
+		log_file ./guests/${guestname}/logs/${guestname}_install.log
+        } elseif { $cmdstr($i) == "-p" || $cmdstr($i) == "--paravirt" } {
+		set pv 1;
+        } elseif { $cmdstr($i) == "-v" || $cmdstr($i) == "--hvm" } {
+		set hv 1;
+#	} elseif { $cmdstr($i) == "-c" || $cmdstr($i) == "--cdrom" } {
+#		set isoname [lindex $argv [expr $i + 1]]
+#		# make sure that isoname ends with .iso
+#		if { ! [regexp .*\/images\/boot\.iso$ $isoname] } {
+#			send_user "Argument to -c option must end with /images/boot.iso\n";
+#			send_user "and must be on an nfs location \n";
+#			exit $install_error(syntax);
+#		}
+#		# we will be using this array element later, when changing the location
+#		# from whatever is given to a location in local FS .. keep the index
+#		set isoidx [expr $i + 1]
+#		set location [lindex $argv [expr $i + 1]]
+	} elseif { $cmdstr($i) == "--extra-args" || $cmdstr($i) == "-x" } {
+		# concentrate all --extra-args into single variable
+		# which we then add to the end of cmdstr as single --extra-args parameter
+		# Bug 531909 - virt-install doesn't process multiple --extra-args
+		if { $extra_args != "" } {
+			append extra_args " "
+		}
+		append extra_args [lindex $argv [expr $i + 1]]
+		set cmdstr($i) ""
+		incr i
+		set cmdstr($i) ""
+
+		if { [regexp ks=(.*?)(\\s|$) $extra_args m1 m2] } {
+			# user has provided a ks file. script will use that one
+			# instead of using one its own
+			set ks 1
+			set kslocation $m2
+			set ksfile [lindex [split $kslocation '/'] end ]
+		}
+	} elseif { $cmdstr($i) == "-l" || $cmdstr($i) == "--location" } {
+		# get the location of the install tree
+		set location [lindex $argv [expr $i + 1]]
+		# we won't need this if this is hvm.. but we'll need this if this is pv
+		set locidx $i
+	} elseif { $cmdstr($i) == "--lvm" || $cmdstr($i) == "--part" } {
+		# backend
+		set installbackend $cmdstr($i)
+		set cmdstr($i) ""
+	} elseif { $cmdstr($i) == "-f" || $cmdstr($i) == "--file" } {
+		set fileidx [expr $i + 1] 
+	} elseif { $cmdstr($i) == "--disk" } {
+		set diskidx [expr $i + 1]
+		set diskargs [lindex $argv [expr $i + 1]]
+	} elseif { [regexp "^--serial" $cmdstr($i) ] } {
+		set serial_device 1
+		
+	# below are custom args that are not be passed on to virt-install directly
+	} elseif { $cmdstr($i) == "--rhtsdebug" } {
+		set rhtsdebug 1
+		set cmdstr($i) ""
+	} elseif { $cmdstr($i) == "--rhel3noapic" } {
+		set rhel3hvmguest 1
+		set cmdstr($i) ""
+	} elseif { $cmdstr($i) == "--virttest" } {
+		set cmdstr($i) ""
+	} elseif { $cmdstr($i) == "--ver6" } {
+		set ver6 1
+		set cmdstr($i) ""
+	}
+
+	
+}
+
+# put concentrated --extra-args to the end of cmdstr
+set cmdstr($i) "--extra-args"
+incr i
+set cmdstr($i) "$extra_args"
+incr i
+
+# prune out any empty elements in the list 
+set argv [lsearch -all -inline -not -exact $argv {}]
+
+## in rhts, we don't want virt-install to reboot the guests after installing 'em
+if { ! $noreboot } {
+	set cmdstr($i) "--noreboot"
+	set noreboot 1
+	incr i
+}
+
+## starting rhel6 virt-install doesn't ask if a graphical console or text
+## console is wanted. We'd like graphical console for all hvm guests.
+if { $hv == 1 && $vnc == 0 && $nographs == 0 && $graphicsgiven == 0 } {
+	set vnc 1
+	set cmdstr($i) "--vnc"
+	incr i
+}
+
+# if we have a request to create fully-virtualized guest, then we have some work
+# to do.. We have to pull the iso, stick our kickstart file in it and and repack
+# it.  
+if { $hv == 1 && $ver6 != 1 } {
+	#variables:
+	set tmpmnt "/mnt/tmp"
+	set tmpbootmnt "/mnt/boottmp"
+	set cwd [exec pwd]
+
+	# got the iso, now make a copy of it:
+	while { [mkdtemp tmpdir] } {
+		#do nothing this is to ensure a unique one is created
+	}
+	
+	set tmpdir "./guests/${guestname}/iso/${tmpdir}"
+
+	# on rhts we'll pull the iso from the location given to us..
+	# installation trees will only be nfs for now but we plan on having http/ftp ones 
+	# in the future too.
+	if { [regexp ^nfs:.* $location ] } {
+		set cp_loc [string map { nfs:// /net/ : "" } $location]
+		# sometimes automount craps out so we'll first try to get boot iso with automount
+		# and try various http locations if that fails. 
+		#
+		# but first a stupid hack..
+                set PWD [pwd]
+                catch {cd $cp_loc/images}
+                cd $PWD
+		if { [catch { exec cp $cp_loc/images/boot.iso ./$guestname.iso } result]} {
+			send_user "WARNING: problem with cp $cp_loc/images/boot.iso $isodir/$guestname.iso \n";
+			send_user " $result \n";
+			send_user "Will try http locations to grab the boot iso.. \n";
+			if { [string match "*/vol/*" $location] } {
+				set http_loc [string map { nfs:// http:// bigpapi download.lab storage download.lab : / /vol/engineering/devarchive/ "" /vol/engineering/ "" /vol/engarchive2/ "" } $location]
+			} else {
+				send_user "Don't know anything about $location \n"
+				exit $preinst_error(setup);
+			}
+			if { [catch { exec wget -q $http_loc/images/boot.iso  -O ./$guestname.iso} result]} {
+				send_user "WARNING: couldn't retrieve boot.iso via wget ${http_loc}/images/boot.iso  -O ./$guestname.iso either\n"
+				send_user " $result \n";
+				send_user "will try another http location \n";
+				if { [string match "*/vol/*" $location] } {
+					set http_loc [string map { nfs:// http:// bigpapi.bos download.eng.rdu storage.bos download.eng.rdu : / /vol/engineering/devarchive/ "" /vol/engineering/ "" /vol/engarchive2/ "" } $location]
+				} else {
+					send_user "Don't know anything about $location \n"
+					exit $preinst_error(setup);
+				}
+
+				if { [catch { exec wget -q $http_loc/images/boot.iso  -O ./$guestname.iso} result]} {
+					send_user "WARNING: couldn't retrieve boot.iso via wget ${http_loc}/images/boot.iso  -O ./$guestname.iso either\n"
+					send_user " $result \n";
+					send_user "I am giving up.... \n";
+					exit $preinst_error(setup);
+				}
+			}
+		}
+	} elseif { [regexp ^(http|ftp):\/\/.* $location ] } {
+		if { [catch {exec wget -q $location/images/boot.iso -O ./$guestname.iso} result]} {
+			send_user "problem with wget -q $location/images/boot.iso -O $isodir/$guestname.iso \n";
+			send_user " $result \n";
+			exit $preinst_error(setup);
+		}
+	
+	}
+		
+	#get the kickstart file into tmpdir:
+	getKSfile $tmpdir
+
+	#mount it so we can edit isolinux.cfg
+	catch {exec umount $tmpmnt} result
+	catch {exec rm -rf $tmpmnt} result
+	if { [catch {exec mkdir -p $tmpmnt} result] } {
+		send_user "problem with mkdir -p $tmpmnt : \n"
+		send_user "$result \n"
+		exit $preinst_error(setup)
+	}
+	
+
+	if { [catch {exec mount -t iso9660 -o loop $guestname.iso $tmpmnt} result] } {
+		send_user "problem: mount -t iso9660 -o loop $guestname.iso $tmpmnt \n"
+		send_user "$result \n";
+		exit $preinst_error(setup);
+	}
+
+	if { [ catch {exec cp -rf ${tmpmnt}/. ./$tmpdir } result ] } {
+		send_user "problem: exec cp -rf /mnt/tmp/ ./$tmpdir : \n";
+		send_user "$result \n";
+		exit $preinst_error(setup);
+	}
+
+	if { [ catch {exec chmod -R 777 ./$tmpdir/ } result ] } {
+		send_user "problem: chmod -R 777 /$tmpdir/ : \n";
+		send_user "$result \n";
+		exit $preinst_error(setup);
+	}
+	
+	if { [ catch {exec umount $tmpmnt } result ] } {
+		send_user "problem: umount $tmpmnt : \n";
+		send_user "$result \n";
+		exit $preinst_error(setup);
+	}
+
+	#get the kickstart file into tmpdir:
+	getKSfile $tmpdir
+
+	
+	switch -regexp $location {
+		.*\/i386\/.*   { set arch "i386"; }
+		.*\/x86_64\/.* { set arch "x86_64"; }
+		.*\/ia64\/.*   { set arch "ia64"; }
+		default {
+			send_user "there either is no arch info in the  \
+				location string, or there is an arch    \
+				which is not supported. The only archs  \
+				that are supported are: i386,x86_64 and \
+				ia64. \n";
+			exit $install_error(setup);
+		}
+	}
+	
+	if { ![string equal $arch "ia64"] } {
+		if { [catch {exec echo "label virt_test_ks\nkernel vmlinuz\n\
+	append initrd=initrd.img ${extra_args} ramdisk_size=20000 console=tty0 console=ttyS0,115200" >> ./$tmpdir/isolinux/isolinux.cfg} result ] } {
+			send_user "problem with appending to isolinux.cfg \n";
+			send_user "$result \n";
+			exit $preinst_error(setup);
+		}
+
+		set rfh [open ./$tmpdir/isolinux/isolinux.cfg r]
+		set wfh [open ./$tmpdir/isolinux/isolinux.cfg.tmp w]
+		set found 0
+		while {[gets $rfh line] >= 0} {
+			if { [regexp ^default.* $line] && $found < 2} {
+				set line "default virt_test_ks";
+				incr found
+			} elseif { [regexp ^timeout.* $line] && $found < 2} {
+				set line "timeout 5";
+				incr found
+			}
+			puts $wfh $line
+		}
+		close $rfh
+		close $wfh
+
+		file rename -force ./$tmpdir/isolinux/isolinux.cfg.tmp ./$tmpdir/isolinux/isolinux.cfg
+
+		cd $tmpdir
+		
+		if { [catch {exec mkisofs -quiet -R -b isolinux/isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table -o $isodir/$guestname.iso .} result ] } {
+			# for some reason mkisofs sometimes prints messages to stderr
+			# even if it creates iso ok, such as:
+			# Unknown file type (unallocated) ./.. - ignoring and
+			# continuing.
+			# So, we won't exit here....
+			#send_user "WARNING:problem with mkisofs command : \n";
+			#send_user "$result \n";
+			#exit $preinst_error(setup);
+		}
+	} else { 
+		set startup_str "fs0:\nelilo linux"
+		set elilo_str "prompt
+default=linux
+timeout=50
+relocatable
+
+image=efi/boot/vmlinuz
+        label=linux
+        read-only
+        initrd=efi/boot/initrd.img
+        append=\"${extra_args} console=tty0 console=ttyS0,115200\"
+"
+		catch {exec umount $tmpbootmnt} result
+		catch {exec rm -rf $tmpbootmnt} result
+		if { [catch {exec mkdir -p $tmpbootmnt} result] } {
+			send_user "problem with mkdir -p $tmpmnt : \n"
+			send_user "$result \n"
+			exit $preinst_error(setup)
+		}
+		# on ia64 machines, xen creates an nvram_ file for the guests and if the installation
+		# goes awry, the subsequent installations fail if that file is still around...
+		if { [file exists /usr/lib/xen/boot/nvram_$guestname ] } {
+			if { [catch {exec rm -rf /usr/lib/xen/boot/nvram_$guestname} ] } {
+				send_user "problem with rm -rf /usr/lib/xen/boot/nvram_$guestname \n"
+				send_user "$result \n"
+				exit $preinst_error(setup)
+			}	
+		}	
+		if { [catch {exec mount -t vfat -o loop ./$tmpdir/boot.img $tmpbootmnt } result ] } {
+			send_user "problem with mount -t vfat -o loop ./$tmpdir/boot.img $tmpbootmnt \n"
+			send_user "$result \n"
+			exit $preinst_error(setup)
+                }
+		if { [catch {exec echo "$elilo_str" > $tmpbootmnt/elilo.conf} result ] } {
+			send_user "problem with creating elilo.conf \n"
+			send_user "$result \n"
+			exit $preinst_error(setup)
+		}
+
+		if { [catch {exec echo "$startup_str" > $tmpbootmnt/startup.nsh} result ] } {
+			send_user "problem with creating startup.nsh \n"
+			send_user "$result \n"
+			exit $preinst_error(setup)
+		}
+
+		if { [catch {exec umount $tmpbootmnt} result ] } {
+			send_user "problem with umount $tmpbootmnt \n"
+			send_user "$result \n"
+			exit $preinst_error(setup)
+                }
+
+		cd $tmpdir
+
+		if { [catch {exec  mkisofs -R -J -T -b boot.img -no-emul-boot -o $isodir/$guestname.iso .} result ] } {
+			# for some reason mkisofs sometimes prints messages to stderr
+			# even if it creates iso ok, such as:
+			# Unknown file type (unallocated) ./.. - ignoring and
+			# continuing.
+			# So, we won't exit here....
+			#send_user "WARNING:problem with mkisofs command : \n";
+			#send_user "$result \n";
+		}
+
+	}
+
+	set cmdstr($locidx) "--cdrom"
+	set cmdstr([expr $locidx + 1]) $isodir/$guestname.iso
+	cd $cwd
+	#if { [catch {exec rm -rf $tmpdir $guestname.iso } result ]} {
+	#	send_user "Warning: problem with rm -rf $tmpdir $guestname.iso : \n"
+	#	send_user "$result"
+	#}
+	# we should be done here with hvm setup...
+
+} ; # end of if { $hv == 1 } 
+
+
+
+# if we have a pv guest install without a KS provided, we are on our own:
+if { $pv && $ks == 0 } {
+	getKSfile
+}
+
+
+
+expect_after {
+	-i $any_spawn_id timeout { send_user "Timeout...\n"; exit $install_error(timeout); }
+}
+
+# if this is block device or lvm backend install, then we need to find out 
+# where to install this ..
+if { $installbackend == "--part" } {
+	# proceed somewhat differently based on if --disk arg is or is not
+	# given..
+	if { $diskidx != 0 } {
+		# --disk args are in the format of path=..,size=..,bus=...
+		# we have to have different logic for single and multiple args
+		set disklist [split $diskargs ,]
+		foreach el $disklist {
+			array set diskdict [ split $el = ]
+		}
+		if { ![info exists diskdict(path)] } {
+			send_user "Can't find the path specified.Please specify\ 
+ a partition name with path= in --disk arg \n";
+			exit $preinst_error(setup);
+		} else {
+			set partname $diskdict(path);
+		}
+	} else {
+		set partname $cmdstr($fileidx)
+	}
+	
+	if { ! [catch {exec mount | grep $partname } result] } {
+		# set the right thing up based on if we have --disk or not
+		if { $diskidx != 0 } {
+			set diskdict(fullpath) [lindex [split [exec mount | grep $partname ]] 0]
+			set cmdstr($diskidx) [string map "path=$diskdict(path) path=$diskdict(fullpath)" $diskargs ]
+			set partname $diskdict(fullpath)
+		} else {
+			set partname [lindex [split [exec mount | grep $cmdstr($fileidx) ]] 0]
+			set cmdstr($fileidx) $partname
+		}
+	} else {
+		send_user "Error in mount | grep $partname . Does the partition exists?\n";
+		exit $preinst_error(setup);
+	}
+	send_user "executing  umount $partname \n";
+	if { [catch {exec umount $partname } result] } {
+		send_user "Can't unmount $partname\n";
+		exit $preinst_error(setup);
+	} 
+	update_fstab $partname
+} elseif { $installbackend == "--lvm" } {
+	if { $diskidx != 0 } {
+		# --disk args are in the format of path=..,size=..,bus=...
+		set disklist [split $diskargs ,]
+		foreach el $disklist {
+			array set diskdict [ split $el = ]
+		}
+		if { ![info exists diskdict(path)] } {
+			send_user "Can't find the path specified.Please specify\ 
+ a partition name with path= in --disk arg \n";
+			exit $preinst_error(setup);
+		} else {
+			set basename [lindex [split $diskdict(path) "/"] end];
+		}
+	} else {
+		set basename [lindex [split $cmdstr($fileidx) "/"] end]
+	}
+	# for whatever reason exec lvdisplay craps out on file descriptors 3&4 being open..
+	# hence this headache:
+	set fd [open |lvdisplay]
+	set lvinfo [read $fd]
+	if { [catch {close $fd} ] } {
+		# donothing
+	}
+	set lvinfo_list [split $lvinfo \n]
+	foreach line $lvinfo_list {
+		switch -regexp -- $line {
+			.*LV\\sName.* {
+				set volume [lindex [split $line] end]
+				if { [regexp .*$basename$ $volume] } {
+					set volname $volume
+				}
+			}
+		}
+	}
+	# if we don't have volname, well it's not good.
+	if { ![info exists volname] } {
+		send_user "sorry can't find an lvm volume with name you provided\n";
+		exit $preinst_error(setup);
+	}
+	if { $diskidx != 0 } {
+		set cmdstr($diskidx) [string map "path=$diskdict(path) path=$volname" $diskargs ]
+	} else {
+        	set cmdstr($fileidx) $volname
+	}
+	if { ! [catch { exec mount | grep $basename } result ] } {
+		set umount_str [lindex [split [exec mount | grep $basename ]] 0]
+		catch {exec umount $umount_str} result
+	}
+	update_fstab $umount_str
+}	
+	
+#virt-install will no longer accept --extra-args command line when --location is
+#not specified. See BZ#593410
+
+foreach {key val} [array get cmdstr] {
+	if { [string trim $val] == "--location" || [string trim $val] == "-l" } {
+		set noloc 0
+	}
+}
+
+# if we have no --location or -l  AND --extra-args or -x .. 
+if { $noloc == 1 } {
+	set arr_size [array size cmdstr]
+	foreach {key val} [array get cmdstr] {
+		if { [string trim $val] == "--extra-args" || [string trim $val] == "-x" } {
+			# we wanna wipe these out.
+			set cmdstr($key) ""
+			for {set i [expr $key + 1 ]} { $i < $arr_size } { incr i } {
+				if {[string match -* $cmdstr($i)] == 0} {
+					set cmdstr($i) " "
+				} else {
+					break
+				}
+			}
+		}
+	}
+}
+
+
+pruneels cmdstr 0 0 
+set mystr [returnfirstel cmdstr]
+while { 1 } {
+	set RETRY_INSTALLATION 0
+	send_user "command: spawn virt-install $mystr \n"
+	send_user "extra_args: $extra_args \n"
+	eval spawn virt-install $mystr
+	set inst_spawn $spawn_id
+
+	set stage 0;
+	set killed 0;
+	set defaults(image)    "$image_dir/$guestname"
+	set defaults(disksize) "10"
+	set defaults(memory)   "512"
+	set defaults(vcpu)     "1"
+	expect {
+		# installer can't connect to serial console for hvm guests hence the following hack
+		# -i $inst_spawn -re (Saving\\sXML\\sboot\\sconfig:|Generated\\sboot\\sXML:)  
+		-i $inst_spawn -exact "Launching console callback"  {
+			if { $hv && $serial_device == 0 && $nographs == 0 } {
+				#sleep 1
+				spawn virsh console $guestname
+				log_file ./guests/${guestname}/logs/${guestname}_install.log
+				set log_spawn $spawn_id
+				expect {
+
+					-i $log_spawn eof {  }
+					-i $log_spawn timeout {  }
+					-i $log_spawn -re "Kernel panic(.*) " { 
+						set timeout 60
+						set guest_crash 1	
+						exp_continue
+					}
+					-i $log_spawn "install exited abnormally" { 
+						set timeout 60
+						set guest_inst_error 1	
+						exp_continue
+					}
+					-i $log_spawn -exact "libvirtError" {
+						send_user "A Libvirt error occurred during installation. \n";
+						catch {exec virsh destroy $guestname} result
+						exit $install_error(libvirt);
+					}
+					-i $log_spawn "Error: mdadm exited with status: 127" {
+						send_user "WARNING: there is an error for mdadm working around it\n"
+						send_user "See BZ: https://bugzilla.redhat.com/show_bug.cgi?id=629373"
+						set mdadm_workaround 1
+						exp_continue;
+						
+					}
+					-i $log_spawn -exact "Generated boot XML:" {
+						set boot_xml 1
+						exp_continue
+					}
+					-i $log_spawn -exact "Saving XML boot config:" {
+						set boot_xml 1
+						exp_continue
+					}
+				}
+				#If the guest crashed exit here 
+				if { $guest_crash == 1 } {
+					send_user "GUEST CRASHED!!!\n"
+					catch {exec virsh destroy $guestname} result
+					exit $install_error(crash)
+				} elseif { $guest_inst_error == 1 } {
+					send_user "INSTALLATION TIME ERROR!!!\n";
+					catch {exec virsh destroy $guestname} result
+					exit $install_error(error)
+				}
+				send_user -- "$expect_out(buffer)"
+				exp_continue;
+			} else {
+				send_user -- "$expect_out(buffer)"
+				exp_continue;
+			}
+		}
+		## if the boot xml is generated already, then the installation has
+		## happened even if the installation quits due to errors for not being
+		## able connect to the display, Xvfb funkies, etc.
+		-i $inst_spawn -exact "Generated boot XML:" {
+			set boot_xml 1
+			exp_continue
+		}
+		-i $inst_spawn -exact "Saving XML boot config:" {
+			set boot_xml 1
+			exp_continue
+		}
+		-i $inst_spawn -exact "What is the name of your virtual machine?" {
+			send_user "a guest name must be given.. existing \n";
+			catch {exec virsh destroy $guestname} result
+			exit $install_error(syntax);
+		}
+		-i $inst_spawn -exact "How much RAM should be allocated (in megabytes)?" {
+			send -i $inst_spawn "$defaults(memory) \n";
+			exp_continue;
+		}
+		-i $inst_spawn -exact "Do you really want to use this disk (yes or no)" {
+			send -i $inst_spawn "yes\n";
+			exp_continue;
+		}
+		-i $inst_spawn -exact "Would you like to enable graphics support? (yes or no)" {
+			if { $hv } {
+				set vnc 1;
+				send -i $inst_spawn "yes\n";
+			} else {
+				send -i $inst_spawn "no\n";
+			}
+			exp_continue;
+		}
+		-i $inst_spawn -re "There is not enough free space to create the disk.*requested.*available" {
+			send_user "There is not enough space on this machine to create all the guests indicated in the recipe\n";
+			send_user "Please use DISK or DISKSPACE hostproperties to ensure that there is enough space on the machine to install all the guests\n";
+			exit $install_error(setup);
+		}
+		-i $inst_spawn -re "Disk .* is already in use by another guest!" {
+			send_user "Diskspace you specified is already in use. Exiting. \n";
+			catch {exec virsh destroy $guestname} result
+			exit $install_error(setup);
+		}
+		-i $inst_spawn -exact "Need to pass size for each disk" {
+			send_user "somehow no diskspace is given. Report this as a bug for virtinstall test\n";
+			catch {exec virsh destroy $guestname} result
+			exit $install_error(setup);
+		}
+		-i $inst_spawn -exact "What is the install location?" {
+			send_user "No install location is given. Exiting. \n";
+			catch {exec virsh destroy $guestname} result
+			exit $install_error(syntax);
+		}
+		-i $inst_spawn -exact "What is the virtual CD image, CD device or install location?" {
+			send_user "No Cdrom path specified. Exiting. \n";
+			catch {exec virsh destroy $guestname} result
+			exit $install_error(syntax);
+		}
+		-i $inst_spawn "Error: mdadm exited with status: 127" {
+			send_user "WARNING: there is an error for mdadm working around it\n"
+			send_user "See BZ: https://bugzilla.redhat.com/show_bug.cgi?id=629373"
+			set mdadm_workaround 1
+			exp_continue;
+			
+		}
+		# workaround for couldn't acquire file errors
+		#
+		# Wed, 13 Jun 2012 17:05:36 ERROR    Error validating install location: Couldn't acquire file /var/tmp/virtinstmnt.XkcRzN/.treeinfo: [Errno 14] Could not open/read file:///var/tmp/virtinstmnt.XkcRzN/.treeinfo
+		-i $inst_spawn -re "\\d\\d:\\d\\d:\\d\\d\\s+ERROR\\s+.*Couldn't acquire file.*Errno 14.*Could not open/read file" {
+			send_user "\n ****************** WARNING ERROR NO 14 ********* \n"
+			set RETRY_INSTALLATION 1
+			set RETURN_WARN 1
+			close -i $inst_spawn
+			catch {exec virsh destroy $guestname} result
+			catch {exec virsh undefine $guestname} result
+
+		}
+		## sometimes, during booting, there could be error messages printed, so
+		# we need to ignore those and exit only on error messages printed
+		# before the installation is complete:
+		#
+		# Error msg format: Thu, 11 Aug 2011 16:37:38 ERROR    Guest name
+		-i $inst_spawn -re "\\d\\d:\\d\\d:\\d\\d\\s+ERROR\\s+" {
+			if { $mdadm_workaround == 0 && $stage == 0 } {
+				set exp "IOError:\\s(.*)\/proc\/mounts"
+				if { [regexp $exp $expect_out(buffer) match] } {
+					send_user "Hit the anamon bug, ignoring and continuing...\n"
+					exp_continue;
+				} else { 
+					send_user "Install error: $expect_out(buffer)  \n";
+					catch {exec virsh destroy $guestname} result
+					exit $install_error(error);
+				}
+			}
+			exp_continue;
+		}
+		# another error format for newer versions of virt-install:
+		# [Thu, 22 Aug 2013 14:47:26 virt-install 23232] ERROR (cli:626) Guest name 'system2' is already in use.
+		-i $inst_spawn -re "virt-install\\s\\d+]\\sERROR\\s\\(" {
+			send_user "Install error: $expect_out(buffer)  \n";
+			catch {exec virsh destroy $guestname} result
+			exit $install_error(error);
+		}
+
+		-i $inst_spawn -exact "How many VCPUs should be attached?" {
+			send -i $inst_spawn "$defaults(vcpu) \n";
+			exp_continue;
+		}
+		-i $inst_spawn -exact "You have asked for more virtual CPUs (%d) than there are physical CPUs (%d) on the host. This will work, but performance will be poor. Are you sure? (yes or no)" {
+			send -i $inst_spawn "yes\n";
+			exp_continue;
+		}
+		-i $inst_spawn -exact "Would you like a fully virtualized guest (yes or no)?  This will allow you to run unmodified operating systems." {
+			send_user "You have to specify if this is hvm or paravirt guest. \n";
+			catch {exec virsh destroy $guestname} result
+			exit $install_error(syntax);
+		}
+		-i  $inst_spawn -exact "What would you like to use as the disk (file path)?" {
+			send -i $inst_spawn "$defaults(image) \n";
+			exp_continue;
+		}
+		-i  $inst_spawn -re "Please enter the path to the file you would like to use for storage. It will have size .*GB." {
+			send -i $inst_spawn "$defaults(image) \n";
+			exp_continue;
+		}
+		-i $inst_spawn -re "How large would you like the disk (.*) to be (in gigabytes)?" {
+			send -i $inst_spawn "$defaults(disksize) \n";
+			exp_continue;
+		}
+		-i $inst_spawn -exact "main:        End of stream" {
+			if { $vnc == 1 } {
+				if { $stage == 0 } {
+					exp_continue;
+				} elseif { $stage == 1 } {
+					send_user "Installation finished successfully\n";
+				} else {
+					send_user "Something's wrong with vnc install\n";
+					catch {exec virsh destroy $guestname} result
+					exit $install_error(vnc);
+				}
+			}
+		}
+
+		-i $inst_spawn -exact "main:        Rect too big" {
+			send_user "Problem with vncserver/install.. \n";
+			catch {exec virsh destroy $guestname} result
+			exit $install_error(vnc);
+		}
+
+		-i $inst_spawn -re "Domain installation still in progress. You can reconnect to.*the console to complete the installation process." {
+			if { $mdadm_workaround == 1 || $boot_xml == 1 } {
+				exp_continue
+			} else {
+				send_user "The console is lost/virt-install quit unexpectedly.\n"
+				send_user "Please investigate\n"
+				catch {exec virsh destroy $guestname} result
+				exit $install_error(error);
+			}
+		}
+
+		-i $inst_spawn -exact "Guest installation complete... restarting guest." {
+			set timeout 20
+			expect {
+				-i $inst_spawn -exact "Domain installation may not have been" { 
+					send_user "looks like installation wasn't successful\n";
+					send_user -- "$expect_out(buffer) \n";
+					catch {exec virsh destroy $guestname} result
+					exit $install_error(error);
+				}
+				-i $inst_spawn timeout { }
+			}
+			set stage 1;
+			if { $vnc == 1 } {
+				set killed 1;
+				send_user "\n Install successful. \n";
+				send -i $inst_spawn \003 ;
+			
+			}
+			# it should restart in few minutes, really.. 
+			set timeout 600
+			exp_continue;
+		}
+
+		-i $inst_spawn -exact "Guest installation complete... you can restart your domain" {
+			send_user "\n Installation of $guestname is SUCCESS!! \n";
+		}
+
+		-i $inst_spawn -exact "<Enter> to reboot" {
+			send -i $inst_spawn "\r\n"
+			exp_continue;
+		}
+		-i $inst_spawn -exact "HVM guest is not supported by your CPU or enabled in your BIOS" {
+			send_user "Looks like the machine is not hvm capable...\n";
+			exit $install_error(nohvmsupported)
+		}
+		-i $inst_spawn -exact "libvirtError" {
+			send_user "A Libvirt error occurred during installation. \n";
+			catch {exec virsh destroy $guestname} result
+			exit $install_error(libvirt);
+		}
+		-i $inst_spawn -re "Kernel panic.*" { 
+			send_user "KERNEL PANIC!\n" 
+			#send_user -- "$expect_out(buffer)  \n";
+			catch {exec virsh destroy $guestname} result
+			exit $install_error(crash);
+		}
+
+		-i $inst_spawn -exact "install exited abnormally" {
+			send_user "Installation exited abnormally. \n";
+			send_user "\n $expect_out(buffer)  \n";
+			catch {exec virsh destroy $guestname} result
+			exit $install_error(error);
+		}
+
+		-i $inst_spawn -exact "Domain installation does not appear to have been\r\n\
+	 successful.  If it was, you can restart your domain\r\n\
+	 by running 'virsh start"
+		{
+			send_user "Domain installation seems to have failed.\n";
+			send_user "\n $expect_out(buffer)  \n";
+			catch {exec virsh destroy $guestname} result
+			exit $install_error(error);
+		}
+		# same as above but different format for some of the virt-install
+                -i $inst_spawn -exact "Domain installation does not appear to have been successful."
+                {
+                        send_user "Domain installation seems to have failed.\n";
+                        send_user "\n $expect_out(buffer)  \n";
+                        catch {exec virsh destroy $guestname} result
+                        exit $install_error(error);
+                }
+
+		-i $inst_spawn " login: " {
+			send -i $inst_spawn " \n"; 
+			send_user "Install successful. \n";
+		}
+
+		-i $inst_spawn eof {
+			if { $noreboot == 1 || $killed == 1 } {
+				send_user "Install of $guestname is SUCCESS!! . \n";
+			} else {
+				send_user "Warning: Install got an unexpected EOF \n";
+				exit $exit_code(warn);
+			}
+		}
+
+		-i $inst_spawn timeout {
+			send_user "installation timed out. \n";
+			catch {exec virsh destroy $guestname} result
+			exit $install_error(timeout);
+		}
+
+
+	}
+	if { $RETRY_INSTALLATION == 0 } {
+		break
+	}
+
+	wait -i $inst_spawn
+}; #end of while
+## RHTS doesn't want us to start/stop guests..
+exec touch /tmp/${guestname}_created
+
+if { [info exists RETURN_WARN] } {
+	exit 14
+} else {
+	exit $exit_code(success)
+}

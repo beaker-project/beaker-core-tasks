@@ -1,0 +1,85 @@
+This test is used to install guests on the dom0 host it's executing on. It
+doesn't need any arguments as the arguments are provided to it by the lab
+controller when the job has guestrecipe . This testis required to install the
+guest machines defined in the guestrecipes.
+
+For more information on how to write and execute virtualization testcases refer
+to the Virtualization workflow information on RHTS wiki page which is linked on
+the homepage of RHTS.
+
+Guest console logs:
+For RHEL5 hypervisors, the guest console forwarding will be set up, unless the
+tester passes on "NORHEL5CONSOLELOGS" parameter to the test. If this
+environment variable is set, then the serial console forwarding won't be set. 
+
+   Currently for rhel6 and over, it'll be set up during the installation time
+that all the console consoles will be forwarded to a file. This file will be at
+/mnt/tests/distribution/virt/install/guests/${guestname}/logs/${guestname}_console.log 
+
+If the tester wants to login to the system and connect to the serial console of
+the guest, s/he will have to change the guest's configuration not to forward the
+serial console to the file. There are a couple scripts provided for this
+purpose, and they are:
+    filetopty.sh: cancel out the file forwarding and free up the console of the
+guest, so that one can connect it via "virsh console $guestname"
+    ptytofile.sh: The reverse of above. 
+These files are provided in the /distribution/virt/utils tests which is a
+requirement for this test.
+
+For the guests in rhel6 hosts, we had forwarded the serial console
+to a file output, but that had blocked the console access and required manual
+invertention if you wanted to change it to console login access via virsh
+console $guest and they were always mutually exclusive. Now you can have both by
+default. It'll still be forwarding serial console output to a file and upload it
+but it'll also allow you login to ttyS1 console via virsh console $guestname. By
+default virsh console tries to login to ttyS0, so to you have to provide it
+correct devname with:
+    virsh console $guestname --devname $devname 
+
+To find out the devname just do virsh dumpxml $guestname and see what the name
+is for the pty console. For example:
+    $ virsh dumpxml i386_kvm
+    ... 
+    <serial type='pty'>
+      <source path='/dev/pts/1'/>
+      <target port='1'/>
+      <alias name='serial1'/>
+    </serial>
+    ...
+
+So for this instance you'd do :
+    virsh console i386_kvm --devname serial1 
+
+One caveat is that, we have rhts-compat service that's run and started up by
+beah, which grabs the console so the console i/o is garbled and unusable. To
+mitigate this, I have created a job in beaker, that you can put in your guests
+after /distribution/install to turn it off. The task is :
+   /distribution/utils/rhts_compat_off 
+If you are doing this manually, you can reboot the guest in single mode and
+disable the service yourself using the console. 
+
+==============================================================================
+Networking:
+By default this test sets up a bridge and uses bridged network for kvm guests.
+Multiple nics can be specified with "--network model=name" in guestargs, for
+example, "--network model=e1000 --network model=virtio" will install a guest
+with two nics, one e1000 the other virtio driver.
+
+==============================================================================
+
+
+Guest domain names:
+  /distribution/virt/start job will be editing host's
+  /etc/hosts file to have the guestname resolve to its respective IP. So, in the
+above instance, you can just do:
+    ssh root@i386_kvm 
+and you should be in the guest.
+===============================================================================
+Test execution synchronization between the guests and hypervisor..
+In the case of a need to wait some specific tasks in a guest to execute before
+running some tasks in the hypervisor, wait4guesttasks script, provided in the
+/distribution/virt/utils package can be used. For more information refer to the
+script itself. 
+
+
+

@@ -1,0 +1,201 @@
+#!/usr/bin/python
+#
+
+# wait4guesttasks
+#   usage: wait4guesttasks <--guestname name | --guestrecipe recipe>  \ 
+#          [--timeout NN[s|m|h|d]] [--interval NN[s|m|h|d]]  \ 
+#          [/task/name /task2/name ...]
+# this script will take a name or recipeid of the guest and list of task to be
+# waited to for completion and a timeout value to wait for all tasks to be
+# completed. If the tasks inside the guest complete with the optional statuses,
+# it'll exit with exit code of 0. If anything goes wrong, it'll exit with an
+# exit code other than zero. timeout argument can take an optional and 
+# case-insensitive suffix of s,m,h,d corresponding to seconds,minutes,hours,days
+# respectively.
+# Everything but either guestname or guestrecipeid is optional. Default values
+# follows:
+#   timeout: none. ie. it'll run forever until the tasks are completed.
+#   interval: set to 120 seconds.
+#   tasks: default is all tasks inside the guest to be completed. 
+# Additionally, a desired result for any task can be given. For that the syntax
+# is :
+#   taskname=result for example /distribution/install=Pass 
+# If no desired status are given, then the script will just wait until the task
+# is completed. For example the following syntax:
+#  .waitforguesttasks.py --guestname myguest /distribution/install=Pass\
+# /my/test
+#  will wait until /distribution/install test inside myguest has completed and
+#  Passed AND the test /my/test has completed. If /distribution/install has a
+#  result other than Pass, it'll exit with an error code. The results are
+#  case-insensitive, so /distribution/install=Pass|pass|PASS are all same.
+#
+import os
+import sys
+import xmlrpclib
+import xml.dom.minidom
+import time
+from optparse import OptionParser
+
+# findguestrecipe
+# looks up the recipeid of the guest. 
+# should be called from the hostmachine where the hypervisor's recipeid will be
+# available. assumes that a connection to global proxy object is established
+# already. 
+def findguestrecipe(name):
+	recipe_xml = proxy.get_my_recipe(dict(recipe_id=os.environ['RECIPEID']))
+	doc = xml.dom.minidom.parseString(recipe_xml)
+	
+	for guestrecipe in doc.getElementsByTagName('guestrecipe'):
+		if guestrecipe.getAttribute('guestname') == name:
+			return guestrecipe.getAttribute('id')
+
+	#if we didn't find it, return None
+	return None
+	
+tasks_list = None
+tasks_dict = { }
+total_sleep = 0
+timeout = -1
+interval = 20
+errors = []
+parser = OptionParser()
+
+proxy = xmlrpclib.ServerProxy('http://%s:8000/RPC2' % os.environ['LAB_CONTROLLER'])
+
+# add options to parser all the options... 
+parser.add_option("--guestname", dest="guestname", help="Name of guest", 
+                  metavar="GUESTNAME")
+parser.add_option("--guestrecipe", dest="guestrecipe", help="Recipeid of guest", 
+                  metavar="GUESTRECIPE")
+parser.add_option("--timeout", dest="timeout", help="Time to wait until the \
+                  tasks are completed", metavar="TIMEOUT")
+parser.add_option("--interval", dest="interval", help="How often to query the \
+                  lab controller to check on the tasks", metavar="INTERVAL")
+
+(options, args) = parser.parse_args()
+
+if not options.guestname and not options.guestrecipe:
+	print "no guestname or guestrecipe"
+	print "either one of them must be supplied"
+	sys.exit(1)
+
+if options.guestrecipe:
+	guestrecipe = options.guestrecipe
+else:
+	guestrecipe = findguestrecipe(options.guestname)
+	if not guestrecipe:
+		print "Can't find recipeid for %s", (options.guestname)
+		sys.exit(3)
+
+if options.timeout:
+	timeout = options.timeout
+	if timeout[-1] == 's' or timeout[-1] == 'S':
+		timeout = int(timeout[:-1])
+	elif timeout[-1] == 'm' or timeout[-1] == 'M':
+		timeout = int(timeout[:-1])
+		timeout = timeout * 60
+	elif timeout[-1] == 'h' or timeout[-1] == 'H':
+		timeout = int(timeout[:-1])
+		timeout = timeout * 3600
+	elif timeout[-1] == 'd' or timeout[-1] == 'D':
+		timeout = int(timeout[:-1])
+		timeout = timeout * 86400
+	timeout = int(timeout)
+	
+if options.interval:
+	interval = options.interval
+	if interval[-1] == 's' or interval[-1] == 'S':
+		interval = int(interval[:-1])
+	elif interval[-1] == 'm' or interval[-1] == 'M':
+		interval = int(interval[:-1])
+		interval = interval * 60
+	elif interval[-1] == 'h' or interval[-1] == 'H':
+		interval = int(interval[:-1])
+		interval = interval * 3600
+	elif interval[-1] == 'd' or interval[-1] == 'D':
+		interval = int(interval[:-1])
+		interval = interval * 86400
+	interval = int(interval)
+
+# if there are any args, they'll be the tasks.
+tasks_list = args
+# default tasks_list is all
+if not tasks_list:
+	tasks_list = []
+	# find all the tasks inside the guest 
+	recipe_xml = proxy.get_my_recipe(dict(recipe_id=guestrecipe))
+	doc = xml.dom.minidom.parseString(recipe_xml)
+	for xmltasks in doc.getElementsByTagName('task'):
+		taskname   = xmltasks.getAttribute('name')
+		tasks_list.append(taskname)
+
+	
+print "guestrecipe that'll be used is: " + guestrecipe
+
+# walk thru tasks and see what (if any) results that needs to be completed
+for task in tasks_list:
+	idv_task = task.split('=')
+	if len(idv_task) > 1:
+		tasks_dict[idv_task[0]] = idv_task[1]
+	else:
+		tasks_dict[idv_task[0]] = None
+
+print "waiting for below tasks to be completed in %s :" % (guestrecipe)
+print "Task name                     Result "
+for key,value in tasks_dict.iteritems():
+	print "%s            %s" % (key,value)
+ 
+while len(tasks_dict) > 0:
+	if timeout > -1:
+		if total_sleep > timeout:
+			print "Timeout waiting for the tasks to complete."
+			if len(errors) > 0:
+				print "Also these tasks didn't have the expected result: "
+				print errors 
+			sys.exit(5)
+
+	recipe_xml = proxy.get_my_recipe(dict(recipe_id=os.environ['RECIPEID']))
+	doc = xml.dom.minidom.parseString(recipe_xml)
+
+	for xmltasks in doc.getElementsByTagName('task'):
+		taskname   = xmltasks.getAttribute('name')
+		taskstatus = xmltasks.getAttribute('status')
+		taskresult = xmltasks.getAttribute('result')
+		if taskstatus != 'Completed':
+			continue
+			
+		if taskname in tasks_dict:
+			# check if we need to be aware of the result
+			if tasks_dict[taskname] is not None:
+				if taskresult.lower() != tasks_dict[taskname].lower():
+					print "For %s looking for %s but got %s" \
+					% (taskname,tasks_dict[taskname],taskresult)
+					errors.append(taskname)
+					del tasks_dict[taskname]
+				else:
+					print "Got %s done" % (taskname)
+					del tasks_dict[taskname]
+					if len(tasks_dict) > 0:
+						print "Now waiting for : "
+						for key,value in tasks_dict.iteritems():
+							print "%s            %s" % (key,value)
+
+			else:
+				print "Got %s done" % (taskname)
+				del tasks_dict[taskname]
+				if len(tasks_dict) > 0:
+					print "Now waiting for : "
+					for key,value in tasks_dict.iteritems():
+						print "%s            %s" % (key,value)
+
+	if len(tasks_dict) == 0:
+		break
+	total_sleep = total_sleep + interval
+	time.sleep(interval)
+								
+if len(errors) > 0:
+	print "These tasks didn't have the expected result: "
+	print errors 
+	sys.exit(2)
+
+sys.exit(0)

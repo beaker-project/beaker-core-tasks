@@ -1,0 +1,41 @@
+#!/usr/bin/expect
+
+if { $argc != 1 && $argc != 2 } {
+	send_user "Usage: $argv0 guestname <timeout>\n";
+	send_user "timeout is optional. \n"
+	exit 1;
+}
+set timeout   -1
+set guestname [lindex $argv 0]
+set prompt    "(%|#|\\\$) $"
+
+if { $argc == 2 } {
+	if { ![string is integer [lindex $argv 1]] } {
+		send_user "Timeout value must be an integer.\n";
+		exit 1;
+	}
+	set timeout [lindex $argv 1]
+}
+
+# spawn whatever the guest is configured with
+if { [catch {exec isfileconsole $guestname} errStr] } {
+	spawn virsh console $guestname
+} else {
+	if { [ catch { set console_file [exec getconsolefile $guestname] } ] } {
+		send_user "error with set console_file \[getconsolefile $guestname\] \n"
+		exit 1;
+	}
+	spawn tail -f $console_file
+}
+expect {
+	"Power down." { exit 0; }
+        timeout {  
+		send_user "didn't get prompt in $timeout seconds \n";
+		exit 1;
+	}
+	eof { exit 0; }
+}
+
+#should never come here ...
+exit 1;  
+        

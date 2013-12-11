@@ -1,0 +1,55 @@
+#!/usr/bin/expect
+
+if { $argc != 1 } {
+	send_user "Usage: $argv0 guestname \n";
+	exit 1;
+}
+set guestname [lindex $argv 0]
+set prompt    "\n(.*?(%|#|\\\$)) $"
+set user "root"
+set pass "rhts"
+set i 0
+log_user 0
+
+spawn virsh console $guestname
+expect {
+	-exact "login: " { send "$user\n"; exp_continue; }
+	-re "(P|p)assword:" { send "$pass\n"; exp_continue; }
+	-re $prompt { 
+		set thelist [split $expect_out(0,string) "\n" ]
+		set theprompt [string trim [lindex $thelist end]]
+		send "hostname\n"; 
+	}
+		 		
+        timeout {  
+		if { $i < 2 } {
+			send "\n"
+			incr i
+			exp_continue
+		} else {
+			send_user "didn't get prompt in $timeout seconds \n";
+			exit 1;
+		}
+	}
+	eof {
+		send_user "Unexpected EOF ..\n";
+		exit 1;
+	}
+}
+
+expect {
+	-re $prompt { 
+		set idx [string first "$theprompt" $expect_out(1,string)]
+		set host [string range $expect_out(1,string) 0 [expr $idx - 1]]
+		send_user "${host}"
+	}
+	timeout {
+		send_user "timeout waiting for the prompt\n"
+	}
+	eof {
+		send_user "eof waiting for the prompt\n"
+	}
+}
+
+exit 0  
+        
