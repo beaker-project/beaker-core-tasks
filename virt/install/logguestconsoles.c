@@ -56,6 +56,7 @@ struct file_record {
 	int in_fd; 
 	int out_fd;
 	int wd;
+	off_t in_pos;
 	off_t pos;
 	off_t last_uploaded_pos;
 	int recipe_id;
@@ -243,7 +244,7 @@ static int read_config_file(int inotify_fd, const char *configfile ) {
 	char *outfilename = NULL;
 	int in_fd, out_fd, wd, errno;
 	long int recipe_id;
-	off_t pos_ret;
+	off_t pos_ret, in_pos_ret;
 	FILE *fp;
 	ssize_t line_read;
 	size_t line_len = 0;
@@ -346,6 +347,14 @@ static int read_config_file(int inotify_fd, const char *configfile ) {
 			perror("open out_fd: ");
 			return 1;
 		}
+
+		in_pos_ret = lseek(in_fd, 0, SEEK_END);
+		if (in_pos_ret < 0 ) {
+			fprintf(stderr, "lseek in_fd\n");
+			in_pos_ret = 0;
+		}
+		fprintf(stdout, "in_pos_ret is: %d\n", (int)in_pos_ret);
+
 		pos_ret = lseek(out_fd, 0, SEEK_END);
 		fprintf(stdout, "pos_ret is: %d\n", (int)pos_ret);
 		if (pos_ret == (off_t) -1 ) {
@@ -374,6 +383,7 @@ static int read_config_file(int inotify_fd, const char *configfile ) {
 		newrecord->in_fd = in_fd;
 		newrecord->out_fd = out_fd;
 		newrecord->wd = wd;
+		newrecord->in_pos = in_pos_ret;
 		newrecord->pos = pos_ret;
 		newrecord->last_uploaded_pos = pos_ret;
 		newrecord->recipe_id = recipe_id;
@@ -720,7 +730,7 @@ int main(int argc, char *argv[], char *envp[]) {
 	char events[EVENT_SIZE] = {0};
 	ssize_t read_bytes;
 	char read_buf[BUF_SIZE];
-	off_t pos_ret;
+	off_t in_pos, in_pos_end;
 	int rc;
 	int found = 0;
 	char *tmp_url = NULL;
@@ -884,7 +894,22 @@ int main(int argc, char *argv[], char *envp[]) {
 				continue;
 			}
 
-			if (event->mask & IN_MODIFY) { 
+			if (event->mask & IN_MODIFY) {
+				in_pos = lseek(in_fd, 0, SEEK_CUR);
+				if (in_pos < 0) {
+					fprintf(stderr, "IN_MODIFY lseek err\n");
+				} else {
+					in_pos_end = lseek(in_fd, 0, SEEK_END);
+					if (in_pos_end < 0) {
+						fprintf(stderr, "lseek SEEK_END err\n");
+					} else {
+						/* in file was truncated, seek to beginning */
+						if (in_pos_end < el->in_pos)
+							in_pos = 0;
+					}
+					lseek(in_fd, in_pos, SEEK_SET);
+				}
+
 				while( (read_bytes = read(in_fd, read_buf, BUF_SIZE) ) > 0 ) {
 					wr_ret = write(out_fd,read_buf,read_bytes);
 					DEBUG3("written in_fd: %d", in_fd);
@@ -902,14 +927,13 @@ int main(int argc, char *argv[], char *envp[]) {
 						prepare_and_upload(el);
 					}
 				}
-			} else if ((event->mask & IN_CLOSE_WRITE) || (event->mask & IN_CLOSE_NOWRITE) ) {
-				pos_ret = lseek(in_fd, 0, SEEK_SET);
-				if (pos_ret == (off_t) -1 ) {
-					fprintf(stderr, "Problem seeking inputfile\n");
-					close(in_fd);
-					close(out_fd);
-					return 1;
+				in_pos_end = lseek(in_fd, 0, SEEK_CUR);
+				if (in_pos_end < 0) {
+					fprintf(stderr, "lseek in_fd after write err\n");
+				} else {
+					el->in_pos = in_pos_end;
 				}
+			} else if ((event->mask & IN_CLOSE_WRITE) || (event->mask & IN_CLOSE_NOWRITE) ) {
 				prepare_and_upload(el);
 			} 
 
