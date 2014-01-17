@@ -7,6 +7,9 @@ PACKAGE_NAME=virt
 # The path of the test below the package:
 RELATIVE_PATH=start
 
+# Provide the legacy package name as well:
+RHTS_PROVIDES_PACKAGE=distribution-distribution-virt-start
+
 # Version of the Test. Used with make tag.
 export TESTVERSION=2.1
 

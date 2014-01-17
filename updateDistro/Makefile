@@ -25,6 +25,9 @@ PACKAGE_NAME=
 # FIXME: you wil need to change this:
 RELATIVE_PATH=updateDistro
 
+# Provide the legacy package name as well:
+RHTS_PROVIDES_PACKAGE=beaker-distribution-updateDistro
+
 # Version of the Test. Used with make tag.
 export TESTVERSION=1.2
 
