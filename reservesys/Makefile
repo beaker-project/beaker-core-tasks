@@ -10,7 +10,7 @@ RELATIVE_PATH=reservesys
 # Provide the legacy package name as well:
 RHTS_PROVIDES_PACKAGE=beaker-distribution-reservesys
 
-export TESTVERSION=2.0
+export TESTVERSION=3.4
 
 export TEST=$(TOPLEVEL_NAMESPACE)/$(RELATIVE_PATH)
 
