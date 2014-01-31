@@ -13,8 +13,8 @@ PACKAGE_NAME=kernel
 # The path of the test below the package:
 RELATIVE_PATH=install
 
-# Provide the legacy package name as well:
-RHTS_PROVIDES_PACKAGE=beaker-distribution-install
+# Preserve the RPM name from the old repo location:
+RHTS_RPM_NAME=beaker-distribution-install
 
 # For organization purposes I have moved this test into the 
 #  /distribution/install/default directory. But it test namespace

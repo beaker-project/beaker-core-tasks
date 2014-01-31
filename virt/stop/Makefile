@@ -7,8 +7,8 @@ PACKAGE_NAME=virt
 # The path of the test below the package:
 RELATIVE_PATH=stop
 
-# Provide the legacy package name as well:
-RHTS_PROVIDES_PACKAGE=distribution-distribution-virt-stop
+# Preserve the RPM name from the old repo location:
+RHTS_RPM_NAME=distribution-distribution-virt-stop
 
 # Version of the Test. Used with make tag.
 export TESTVERSION=2.0

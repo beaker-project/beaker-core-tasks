@@ -7,8 +7,8 @@ TOPLEVEL_NAMESPACE=/distribution
 # The path of the test below the package:
 RELATIVE_PATH=reservesys
 
-# Provide the legacy package name as well:
-RHTS_PROVIDES_PACKAGE=beaker-distribution-reservesys
+# Preserve the RPM name from the old repo location:
+RHTS_RPM_NAME=beaker-distribution-reservesys
 
 export TESTVERSION=3.4
 
