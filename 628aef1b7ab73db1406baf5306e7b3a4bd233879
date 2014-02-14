@@ -1,0 +1,8 @@
+Verified+1: Dan Callaghan <dcallagh@redhat.com>
+Code-Review+2: Raymond Mancy <rmancy@redhat.com>
+Code-Review+2: Nick Coghlan <ncoghlan@redhat.com>
+Submitted-by: Dan Callaghan <dcallagh@redhat.com>
+Submitted-at: Fri, 14 Feb 2014 00:08:10 +0000
+Reviewed-on: http://gerrit.beaker-project.org/2716
+Project: beaker-core-tasks
+Branch: refs/heads/master
