@@ -77,9 +77,11 @@ MOTD()
 
 SYSLOGLVL()
 {
-    # Configure a default log level so we can send our own messages to console
-    echo "local2.info      /dev/console" >> /etc/syslog.conf
-    /sbin/service syslog restart
+    if [ -f /etc/syslog.conf ] ; then
+        # Configure a default log level so we can send our own messages to console
+        echo "local2.info      /dev/console" >> /etc/syslog.conf
+        /sbin/service syslog restart
+    fi
 }
 
 SysReport ()

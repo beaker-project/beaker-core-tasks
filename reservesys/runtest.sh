@@ -32,7 +32,10 @@ RprtRslt()
 MOTD()
 {
     FILE=/etc/motd
-    mv $FILE $FILE.orig
+    cp $FILE $FILE.orig
+    if selinuxenabled &>/dev/null ; then
+        restorecon $FILE.orig
+    fi
 
     local admonition=
     if [ -n "$BEAKER_RESERVATION_POLICY_URL" ] ; then
