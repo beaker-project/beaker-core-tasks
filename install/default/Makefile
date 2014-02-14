@@ -14,7 +14,7 @@ PACKAGE_NAME=kernel
 RELATIVE_PATH=install
 
 # Preserve the RPM name from the old repo location:
-RHTS_RPM_NAME=beaker-distribution-install
+export RHTS_RPM_NAME=beaker-distribution-install
 
 # For organization purposes I have moved this test into the 
 #  /distribution/install/default directory. But it test namespace

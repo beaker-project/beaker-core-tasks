@@ -26,7 +26,7 @@ PACKAGE_NAME=
 RELATIVE_PATH=updateDistro
 
 # Preserve the RPM name from the old repo location:
-RHTS_RPM_NAME=beaker-distribution-updateDistro
+export RHTS_RPM_NAME=beaker-distribution-updateDistro
 
 # Version of the Test. Used with make tag.
 export TESTVERSION=1.2

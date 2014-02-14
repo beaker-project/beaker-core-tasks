@@ -8,7 +8,7 @@ PACKAGE_NAME=virt
 RELATIVE_PATH=install
 
 # Preserve the RPM name from the old repo location:
-RHTS_RPM_NAME=distribution-distribution-virt-install
+export RHTS_RPM_NAME=distribution-distribution-virt-install
 
 # Version of the Test. Used with make tag.
 export TESTVERSION=4.0

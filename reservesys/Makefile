@@ -8,7 +8,7 @@ TOPLEVEL_NAMESPACE=/distribution
 RELATIVE_PATH=reservesys
 
 # Preserve the RPM name from the old repo location:
-RHTS_RPM_NAME=beaker-distribution-reservesys
+export RHTS_RPM_NAME=beaker-distribution-reservesys
 
 export TESTVERSION=3.4
 

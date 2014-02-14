@@ -26,7 +26,7 @@ PACKAGE_NAME=
 RELATIVE_PATH=inventory
 
 # Preserve the RPM name from the old repo location:
-RHTS_RPM_NAME=beaker-distribution-inventory
+export RHTS_RPM_NAME=beaker-distribution-inventory
 
 # Version of the Test. Used with make tag.
 export TESTVERSION=1.2

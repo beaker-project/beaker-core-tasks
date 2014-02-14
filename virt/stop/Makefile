@@ -8,7 +8,7 @@ PACKAGE_NAME=virt
 RELATIVE_PATH=stop
 
 # Preserve the RPM name from the old repo location:
-RHTS_RPM_NAME=distribution-distribution-virt-stop
+export RHTS_RPM_NAME=distribution-distribution-virt-stop
 
 # Version of the Test. Used with make tag.
 export TESTVERSION=2.0
