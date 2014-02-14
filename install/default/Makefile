@@ -21,7 +21,7 @@ RHTS_RPM_NAME=beaker-distribution-install
 #  will remain /distribution/install 
 
 # Required variables
-export TESTVERSION=1.10
+export TESTVERSION=1.12
 export TEST=$(TOPLEVEL_NAMESPACE)/$(RELATIVE_PATH)
 TEST_DIR=/mnt/tests$(TEST)
 BINFILE=hvm_detect
