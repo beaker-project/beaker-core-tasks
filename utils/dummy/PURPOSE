@@ -1,0 +1,17 @@
+Purpose: This test does absolutely nothing. The only reason to use this test
+is align multihost tests in a recipe set, as each multihost test must be
+executed in the same relative position on each host. For example (other
+elements omitted for clarity):
+
+<recipeSet>
+  <recipe>
+    <task role='STANDALONE' name='/distribution/install'/>
+    <task role='STANDALONE' name='/my/test/number1'/>
+    <task role='SERVERS'    name='/my/multihost/test'/>
+  </recipe>
+  <recipe>
+    <task role='STANDALONE' name='/distribution/install'/>
+    <task role='STANDALONE' name='/distribution/utils/dummy'/>
+    <task role='CLIENTS'    name='/my/multihost/test'/>
+  </recipe>
+</recipeSet>
