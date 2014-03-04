@@ -64,6 +64,9 @@ MOTD()
  For ssh, kvm, serial and power control operations please look here:
   ${BEAKER}view/$HOSTNAME
 
+ For the default root password, see:
+  ${BEAKER}prefs/
+
       Beaker Test information:
                          HOSTNAME=$HOSTNAME
                             JOBID=$JOBID
