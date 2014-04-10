@@ -1139,8 +1139,16 @@ while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args 
         NWARG=""
         for opts in ${GIVENNW}
         do
-            NWARG="${NWARG} --network bridge:${brdev},${opts}"
+            # skip adding brdev when using --network type=...
+            # (the user probably knows what they are doing,
+            # and adding bridge:... will interfere)
+            if [[ "${opts}" == type=* || "${opts}" == *,type=* ]]; then
+               NWARG="${NWARG} --network ${opts}"
+            else
+               NWARG="${NWARG} --network bridge:${brdev},${opts}"
+            fi
         done
+
         CMDLINE=$(echo ${CMDLINE} | sed -e 's/--extra-args "/--extra-args "ksdevice=eth0 /')
         CMDLINE="${CMDLINE} --ver6 ${NWARG}"
         
