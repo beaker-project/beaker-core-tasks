@@ -10,17 +10,17 @@ xml_tries = 1
 interval = 300
 proxy = xmlrpclib.ServerProxy('http://%s:8000/RPC2' % os.environ['LAB_CONTROLLER'])
 while xml_tries < 5:
-	try: 
-		recipe_xml = proxy.get_my_recipe(dict(recipe_id=os.environ['RECIPEID']))
-		break
-	except:
-		print "Couldn't get guestinfo from %s . sleeping %i secs" % (os.environ['LAB_CONTROLLER'] , interval)
-		time.sleep(interval)
-		xml_tries += 1
+    try:
+        recipe_xml = proxy.get_my_recipe(dict(recipe_id=os.environ['RECIPEID']))
+        break
+    except:
+        sys.stderr.write("Couldn't get guestinfo from %s . sleeping %i secs\n" % (os.environ['LAB_CONTROLLER'], interval))
+        time.sleep(interval)
+        xml_tries += 1
 
 if xml_tries == 5:
-	print "Can't get guestinfo from %s" % os.environ['LAB_CONTROLLER']
-	sys.exit(1)
+    sys.stderr.write("Can't get guestinfo from %s\n" % os.environ['LAB_CONTROLLER'])
+    sys.exit(1)
 
 
 doc = xml.dom.minidom.parseString(recipe_xml)
