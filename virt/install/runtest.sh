@@ -20,33 +20,6 @@ DEBUGLOG=`mktemp -p /mnt/testarea -t virtinstall.XXXXXX`
 # locking to avoid races
 lck=$OUTPUTDIR/$(basename $0).lck
 
-function TurnOnLibvirtdLogging() 
-{
-    if alias | grep cp=; then
-       unalias cp
-    fi
-    cp -f /etc/libvirt/libvirtd.conf /etc/libvirt/libvirtd.conf.orig
-    echo 'log_filters="1:libvirt 1:util 1:qemu"' >> /etc/libvirt/libvirtd.conf
-    echo 'log_outputs="1:file:/tmp/libvirtd_debug.log"' >> /etc/libvirt/libvirtd.conf
-
-    if ! service libvirtd restart; then 
-	echo "There was a problem restarting libvirtd!!!" 
-    fi
-}
-
-
-function TurnOffLibvirtdLogging() 
-{
-
-    perl -pi.bak -e 's/^log_.*$//g' /etc/libvirt/libvirtd.conf
-  
-    if ! service libvirtd restart; then 
-	echo "There was a problem restarting libvirtd!!!" 
-    fi
-}
-
-
-
 # Log a message to the ${DEBUGLOG} or to /dev/null
 function DeBug ()
 {
@@ -204,54 +177,6 @@ EOF
     sleep 5
     DeBug "Exit SelectKernel"
     return 0
-}
-
-
-
-
-function SubmitLog ()
-{
-    LOG=$1
-    rhts_submit_log -l $LOG
-}
-
-function SubmitVirtLogs () 
-{
-    # submit the relevant logfiles
-    if [[ ${kvm_num} > 0 ]]; then 
-       for kvmlog in $(find /var/log/libvirt/qemu/ -type f)
-       do
-           rhts_submit_log -l ${kvmlog}
-       done
-    else 
-       for xenlog in $(find /var/log/xen/ -type f)
-       do
-         rhts_submit_log -l ${xenlog}
-       done
-       for dumps in $(find /var/lib/xen/dump -type f)
-       do
-         rhts_submit_log -l ${dumps}
-       done
-    fi
-    
-    rhts_submit_log -l ${DEBUGLOG}
-    
-    #submit dmesg
-    dmesg > ./dmesg.txt
-    rhts_submit_log -l ./dmesg.txt
-    # Always submit the audit.log
-    rhts_submit_log -l /var/log/audit/audit.log
-    #submit virt-install log file
-    if [ -e ${HOME}/.virtinst/virt-install.log ]; then
-        rhts_submit_log -l ${HOME}/.virtinst/virt-install.log
-    fi
-    #submit libvirtd debug log...
-    if [ -e /tmp/libvirtd_debug.log ]; then 
-        rhts_submit_log -l /tmp/libvirtd_debug.log
-        # clean the log for the next test
-        echo "" > /tmp/libvirtd_debug.log
-    fi
-    
 }
 
 function fallocate_files ()

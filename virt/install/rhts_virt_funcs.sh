@@ -104,12 +104,12 @@ function submitvirtlogs {
          fi
        done
     fi
-    
-    #submit libvirtd debug log...
-    if [ -e /tmp/libvirtd_debug.log ]; then 
-        rhts_submit_log -l /tmp/libvirtd_debug.log
+
+    # submit libvirtd debug log if requested
+    if [ -n "$LIBVIRTD_DEBUG" -a -e /var/tmp/libvirtd_debug.log ] ; then
+        rhts_submit_log -l /var/tmp/libvirtd_debug.log
         # clean the log for the next test
-        echo "" > /tmp/libvirtd_debug.log
+        echo "" > /var/tmp/libvirtd_debug.log
     fi
 
     if setvirttestargs; then 
@@ -147,7 +147,7 @@ function TurnOnLibvirtdLogging()
     fi
     cp -f /etc/libvirt/libvirtd.conf /etc/libvirt/libvirtd.conf.orig
     echo 'log_filters="1:libvirt 1:util 1:qemu"' >> /etc/libvirt/libvirtd.conf
-    echo 'log_outputs="1:file:/tmp/libvirtd_debug.log"' >> /etc/libvirt/libvirtd.conf
+    echo 'log_outputs="1:file:/var/tmp/libvirtd_debug.log"' >> /etc/libvirt/libvirtd.conf
 
     if ! service libvirtd restart; then 
 	echo "There was a problem restarting libvirtd!!!" 

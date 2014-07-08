@@ -4,55 +4,6 @@
 # related logs. It submits logfiles based on the type of the hypervisor. 
 #
 
-if isxen; then 
-	#submit xen logs
-	for xenlog in $(find /var/log/xen/ -type f | tr '\n' "${IFS}")
-	do
-		rhts_submit_log -l ${xenlog}
-	done
-	for xenlog in $(find /var/log/xen/console -type f | tr '\n' "${IFS}")
-	do
-		rhts_submit_log -l ${xenlog}
-	done
-	# submit dmesg
-	dmesg > ./dmesg.txt
-	rhts_submit_log -l ./dmesg.txt
+. /usr/local/bin/rhts_virt_funcs.sh
 
-else
-	for qemulog in $(find /var/log/libvirt/qemu -type f | tr '\n' "${IFS}")
-	do
-		rhts_submit_log -l ${qemulog}
-	done
-	# submit dmesg
-	dmesg > ./dmesg.txt
-	rhts_submit_log -l ./dmesg.txt
-
-fi
-
-#submit libvirtd debug log...
-if [ -e /tmp/libvirtd_debug.log ]; then 
-rhts_submit_log -l /tmp/libvirtd_debug.log
-# clean the log for the next test
-echo "" > /tmp/libvirtd_debug.log
-fi
-
-if setvirttestargs; then 
-
-  if [[ x"${VIRT_TESTARGS}" != "x" ]]; then 
-     OLDIFS=${IFS}
-     IFS="|"
-     for guestname in $VIRT_TESTARGS
-     do
-       if [ -d $(pwd)/${guestname}/logs ]; then 
-          unset IFS
-	  for file in $(ls $(pwd)/${guestname}/logs)
-	  do
-	    rhts_submit_log -l $(pwd)/${guestname}/logs/${file}
-	  done
-	  IFS="|"
-       fi
-     done
-     IFS=${OLDIFS}
-  fi
-fi
-
+submitvirtlogs
