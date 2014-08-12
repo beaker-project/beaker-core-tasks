@@ -45,5 +45,22 @@ rlJournalStart
             rlRun -l "beaker-system-scan --server $server -h $hostname"
         fi
     rlPhaseEnd
+
+    rlPhaseStart WARN check_virt_enabled
+        if journalctl --dmesg &>/dev/null ; then
+            # systemd journal
+            if journalctl --dmesg | grep "kvm.*disabled" ; then
+                kvm_disabled=1
+            fi
+        else
+            # syslog
+            if grep "kvm.*disabled" /var/log/messages ; then
+                kvm_disabled=1
+            fi
+        fi
+        if [ -n "$kvm_disabled" ] ; then
+            rlFail "Kernel reports that KVM is disabled. Check BIOS/firmware settings to ensure virt CPU features are enabled."
+        fi
+    rlPhaseEnd
 rlJournalPrintText
 rlJournalEnd
