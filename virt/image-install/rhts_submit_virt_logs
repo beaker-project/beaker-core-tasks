@@ -1,0 +1,9 @@
+#!/bin/bash
+#
+# This script is a wrap-around rhts_submit_log script to submit virtualization
+# related logs. It submits logfiles based on the type of the hypervisor. 
+#
+
+. /usr/local/bin/rhts_virt_funcs.sh
+
+submitvirtlogs

@@ -1,0 +1,62 @@
+#!/usr/bin/expect
+#
+# Usage: scp.exp <-f File> <-h Remotehost> [-u User] [-p Password] [-t timeout]  
+#
+# username, password, timeout are optional.
+
+set USAGE_STR "$argv0 <-f|--file LocalFile> <-h|--host Remotehost> \[-F|--File \
+remotefile\] \[-u|--user User\] \[-p|--password Password\] \[-t|--timeout \
+timeout\] \n"
+set username "root"
+set password "redhat"
+set remotefile "~/."
+if { $argc < 4 || $argc > 12 } {
+	send_user "Usage: ${USAGE_STR} \n"
+	exit 1
+}
+
+for {set i 0} { $i < $argc } { incr i } {
+
+	set cur_arg [lindex $argv $i]
+	if { $cur_arg == "-f" || $cur_arg == "--file" } {
+		set localfile [lindex $argv [incr i] ]
+	} elseif { $cur_arg == "-h" || $cur_arg == "--host" } {
+		set remotehost [lindex $argv [incr i] ]
+	} elseif { $cur_arg == "-F" || $cur_arg == "--File" } {
+		set remotefile [lindex $argv [incr i] ]
+	} elseif { $cur_arg == "-u" || $cur_arg == "--user" } {
+		set username [lindex $argv [incr i] ]
+	} elseif { $cur_arg == "-p" || $cur_arg == "--password" } {
+		set password [lindex $argv [incr i] ] 
+	} elseif { $cur_arg == "-t" || $cur_arg == "--timeout" } {
+		set timeout [lindex $argv [incr i] ]
+	} else {
+		send_user "unknown arg: $cur_arg \n"
+		send_user "Usage: ${USAGE_STR} \n"
+		exit 1
+	}
+
+}
+
+if { ![info exists localfile] } {
+	send_user "No file option is given!!!\n";
+	send_user "Usage: ${USAGE_STR} \n"
+	exit 1
+} elseif { ![info exists remotehost] } {
+	send_user "No file option is given!!!\n";
+	send_user "Usage: ${USAGE_STR} \n"
+	exit 1
+}
+	
+
+spawn scp $localfile ${username}@${remotehost}:${remotefile}
+set scp_spawn $spawn_id
+expect {
+	-i $scp_spawn "connecting (yes/no)? " { send -i $scp_spawn "yes\n"; exp_continue; }
+	-i $scp_spawn -re "(P|p)assword: " { send -i $scp_spawn "$password\n"; exp_continue; }
+	-i $scp_spawn "No such file or directory" { send_user "No such file or dir\n"; exit 1; }
+	-i $scp_spawn "Permission denied," {send_user "wrong password, exiting.\n"; exit 1; }
+	-i $scp_spawn -exact "100%" { exp_continue }
+	-i $scp_spawn timeout { send_user "expect timeout!\n"; exit 1}
+	-i $scp_spawn eof { exit 0 }
+}

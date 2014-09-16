@@ -1,0 +1,52 @@
+#!/usr/bin/expect
+#
+# utility script to stop the guest and make sure that it has shutdown
+# it has a default of 5 minutes to wait for the guest to shut
+#
+
+if { $argc < 1 } {
+	send_user "Usage: $argv0 guestname <optional timeout value>"
+	exit 1
+}
+
+# stupid hack for when this is called from a script
+if { $argc == 1 } {
+	set argv_tmp [lindex $argv 0]
+	set argv [split $argv_tmp]
+}
+
+if { [llength $argv] > 1 } {
+	set waittimeout [lindex $argv 1]
+} else {
+	set waittimeout 300
+}
+
+set guest  [lindex $argv 0]
+set prompt "(%|#|\\\$) $" 
+log_user 0
+
+spawn xm shutdown $guest
+set stop_spawn $spawn_id
+
+expect {
+	-i $stop_spawn timeout { 
+		send_user "timeout on xm shutdown $guest\n"; 
+		exit 1; 
+	}
+	-i $stop_spawn eof { }
+}
+
+spawn xm console $guest
+set con_spawn $spawn_id
+set timeout $waittimeout
+
+expect {
+	-i $con_spawn "System halted." { exit 0; }
+	-i $con_spawn timeout { 
+		send_user "stop timeout\n"; 
+		exit 1;
+	 }
+	-i $con_spawn eof {  exit 0; }
+}
+
+exit 1;

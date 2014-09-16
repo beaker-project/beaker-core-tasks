@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if [[ $# < 1 ]]; then 
+	echo "Usage: $0 guestname"
+	exit 1
+fi
+
+if ! virsh list | grep -q $1; then 
+	exit 0
+else
+	exit 1
+fi

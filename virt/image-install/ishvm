@@ -1,0 +1,16 @@
+#!/bin/bash
+#
+# script to determine if it's an hvm guest
+# returns 0 if it is, non-zero if it is not.
+#
+
+if [[ $# != 1 ]]; then 
+	echo "Need a guest name as an argument"
+	exit 1;
+fi
+
+if virsh dumpxml $1 | grep -q '>hvm<'; then 
+	exit 0
+else
+	exit 1
+fi

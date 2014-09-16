@@ -1,0 +1,51 @@
+#!/usr/bin/python
+
+import xmltramp
+import xmlrpclib
+import time
+import sys
+from beah import config
+from datetime import datetime, timedelta
+
+lab_controller = None
+
+USAGE_TEXT = """
+Usage: wait4guest guestrecipeid <timeout>
+
+timeout is optional and is in seconds
+"""
+
+def configure():
+    config.backend_conf(filename='beah_beaker.conf')
+
+def loop(recipeid, timeout):
+    conf = config.get_conf('beah-backend')
+    lab_controller = conf.get('DEFAULT','LAB_CONTROLLER')
+    server = xmlrpclib.ServerProxy(lab_controller)
+    while True:
+        myxml = server.get_my_recipe(dict(recipe_id=recipeid))
+        status = xmltramp.parse(myxml).recipeSet.guestrecipe()['status']
+        if status in ['Running']:
+            sys.exit(0)
+        if timeout and timeout < datetime.now():
+            print "Timeout Exceeded"
+            sys.exit(1)
+        time.sleep(60)
+
+def usage():
+    sys.stderr.write(USAGE_TEXT)
+    sys.exit(-1)
+
+def main():
+    if len(sys.argv) < 2:
+        usage()
+    recipeid = sys.argv[1]
+    if len(sys.argv) == 3:
+        timeout = datetime.now() + timedelta(seconds = int(sys.argv[2]))
+    else:
+        timeout = None
+    configure()
+    loop(recipeid, timeout)
+
+if __name__ == '__main__':
+    main()

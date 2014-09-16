@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+# a stupid script to determine is the system is running on xen kernel or not 
+# returns zero if it is, non-zero if it's not..
+
+if uname -r | grep -q xen; then 
+	exit 0
+else
+	exit 1
+fi
+

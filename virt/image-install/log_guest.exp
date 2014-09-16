@@ -1,0 +1,22 @@
+#!/usr/bin/expect
+
+if { $argc != 1 } {
+   send_user "Usage: $argv0 <guestname> \n";
+   exit 1;
+}
+
+set timeout -1
+set guestname [lindex $argv 0]
+set logfile [open /var/log/xen/console/guest-${guestname}.log a]
+fconfigure $logfile -buffering line
+while {1} {
+
+	spawn virsh console $guestname
+	set console_spawn $spawn_id
+	expect { 
+		-i $console_spawn .* { puts $logfile $expect_out(buffer); exp_continue; }
+		-i $console_spawn eof { sleep 3; wait -i $console_spawn }
+	}
+
+}
+

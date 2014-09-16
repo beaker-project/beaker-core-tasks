@@ -1,0 +1,4 @@
+Based on /distribution/virt/install for executing guest recipes, supports the 
+same features as that task. Rather than booting the installer inside the guest 
+and running through a complete installation, this task fetches a cloud image 
+and boots that. The guest kickstart is approximated using cloud-init.
