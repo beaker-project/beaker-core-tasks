@@ -110,6 +110,7 @@ $(METADATA):
 	@echo "Requires:	openssl-devel"  >> $(METADATA)
 	@echo "Requires:	libcurl-devel"  >> $(METADATA)
 	@echo "Requires:	libxml2-devel"  >> $(METADATA)
+	@echo "Requires:	pykickstart"  >> $(METADATA)
 	@echo "Requires:	@virtualization" >> $(METADATA)
 	@echo "Requires:	@virtualization-platform" >> $(METADATA)
 	@echo "Requires:	@virtualization-tools" >> $(METADATA)
