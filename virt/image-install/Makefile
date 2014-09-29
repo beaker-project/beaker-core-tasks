@@ -63,6 +63,7 @@ FILES=	$(METADATA)       \
 	virtinstall.exp   \
 	get_guest_info.py \
 	get_guest_fqdn.py \
+	get_user_data.py  \
 	start_recipe.py   \
 	logguestconsoles.c \
 	logguestconsoles.initd \
