@@ -1010,21 +1010,12 @@ while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args 
    #CMDLINE="-b xenbr${bridge} -n ${guestname} -f ${IMAGE} $args"
    CMDLINE="--name ${guest_name} --mac ${guest_mac} --location ${guest_loc} $guest_args --debug"
    if [[ ${kvm_num} > 0 ]]; then
-      if grep -q console=ttyS1 ./${guest_name}.ks; then 
-         CMDLINE="${CMDLINE} --extra-args \"ks=$guest_ks serial\""
-      else
-         CMDLINE="${CMDLINE} --extra-args \"ks=$guest_ks serial console=tty0 console=ttyS0,115200\""
-      fi
+      CMDLINE="${CMDLINE} --extra-args \"ks=$guest_ks serial console=tty0 console=ttyS0,115200\""
    else   
       ## the first 2 conditions are for fedora releases since they too can support xen guests.
       if grep -q -i fedora /etc/fedora-release; then
-         if grep -q console=ttyS1 ./${guest_name}.ks; then
-             CMDLINE="${CMDLINE} --extra-args \"ks=$guest_ks serial\" --serial file,path=$(pwd)/guests/${guest_name}/logs/${guest_name}_console.log --serial pty --console pty "
-             CMDLINE="${CMDLINE} --nographics"
-         else 
-             CMDLINE="$CMDLINE --serial file,path=$(pwd)/guests/${guest_name}/logs/${guest_name}_console.log --extra-args \"ks=$guest_ks serial console=tty0 console=ttyS0,115200\"" 
-             CMDLINE="${CMDLINE} --nographics"
-         fi
+         CMDLINE="${CMDLINE} --extra-args \"ks=$guest_ks serial\" --serial file,path=$(pwd)/guests/${guest_name}/logs/${guest_name}_console.log --serial pty --console pty "
+         CMDLINE="${CMDLINE} --nographics"
       else
          CMDLINE="${CMDLINE} --extra-args ks=$guest_ks"
       fi
@@ -1085,11 +1076,7 @@ while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args 
         echo ${CMDLINE} | awk '{rc=0; for(i=1;i<=NF;i++) { if ( $i == "--virttest" || $i  ~ /--serial*/) exit 1 } exit 0 }'
         rc=$?
         if [[ ${rc} == 0 ]]; then
-            if grep -q console=ttyS1 ./${guest_name}.ks; then 
-               CMDLINE="$CMDLINE --serial file,path=$(pwd)/guests/${guest_name}/logs/${guest_name}_console.log --serial pty --console pty "
-            else
-               CMDLINE="$CMDLINE --serial file,path=$(pwd)/guests/${guest_name}/logs/${guest_name}_console.log"
-            fi
+            CMDLINE="$CMDLINE --serial file,path=$(pwd)/guests/${guest_name}/logs/${guest_name}_console.log --serial pty --console pty "
             # workaround for BZ: 731115
             l_guest_name=$(echo ${guest_name} | tr [:upper:] [:lower:])
             if [[ x"$guest_name" != x"$l_guest_name" ]]; then 
