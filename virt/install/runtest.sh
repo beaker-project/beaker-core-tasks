@@ -725,25 +725,24 @@ ONBOOT=yes
 TYPE=Bridge
 DELAY=0
 EOF
-      
-         service NetworkManager stop
-         chkconfig NetworkManager off
-         chkconfig network on
-         service network restart
-         if [[ $? != 0 ]]; then 
-             echo "problem restarting network" | tee -a $OUTPUTFILE
 
-             rpm -qa initscripts | grep "\.el7"
-             if [ $? -eq 0 ]; then
-                 echo "This is known RHEL7 issue, proceeding anyway.." | tee -a $OUTPUTFILE
-                 echo "Bug 886090 - ifcfg- config contains ONBOOT=yes for interface with no link" | tee -a $OUTPUTFILE
-                 report_result ${TEST}_networksetup FAIL 1
-             else
-                 report_result ${TEST}_networksetup FAIL 1
-                 exit 1
-             fi
+         if rlIsRHEL '<7' ; then
+            service NetworkManager stop
+            chkconfig NetworkManager off
+            chkconfig network on
+            service network restart
          else
-             echo "configured a bridge: $netdev "
+            # Turn on NetworkManager which supports bridging on RHEL7
+            chkconfig NetworkManager on
+            service NetworkManager restart
+         fi
+
+         if [[ $? != 0 ]]; then
+            echo "problem restarting network" | tee -a $OUTPUTFILE
+            report_result ${TEST}_networksetup FAIL 1
+            exit 1
+         else
+            echo "configured a bridge: $netdev "
          fi
 
          echo "Rebooting after configuring the bridge" >> $OUTPUTFILE
