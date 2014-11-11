@@ -3,6 +3,7 @@
 # Source the common test script helpers
 . /usr/bin/rhts_environment.sh
 . /usr/local/bin/rhts_virt_funcs.sh
+. /usr/share/beakerlib/beakerlib.sh
 
 result=PASS
 value=0
@@ -945,11 +946,8 @@ done < ./tmp.guests
 # only after qemu creates those files
 #
 # on some rhel5 releases xmlrpc-c package doesn't exist, install it here
-if [ ${ver:0:1} -lt 6 ]; then
-    minor_ver=$(sed 's/.* release 5\.\([0-9]*\) .*/\1/' /etc/redhat-release) 
-    if [[ ${minor_ver} < 6 && ${minor_ver} > 3 ]]; then 
+if rlIsRHEL 5.4 5.5 ; then
         setuprhel5_xmlrpcc
-    fi
 fi
 
 if setupconsolelogs; then
@@ -1196,8 +1194,8 @@ fi
 # turn on service for rhel5 console writing.
 # This is after the guests are installed so that it won't try to steal console
 # from the installation
-if [ ${ver:0:1} -lt 6 -a ${minor_ver} -gt 3 -a -z "${NORHEL5CONSOLELOGS}" ]; then
-        setuprhel5consoles 
+if rlIsRHEL 5 && rlIsRHEL '>5.3' && [ -z "${NORHEL5CONSOLELOGS}" ]; then
+    setuprhel5consoles
 fi
 
 # submit the relevant logfiles
