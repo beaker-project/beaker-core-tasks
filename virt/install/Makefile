@@ -92,7 +92,6 @@ $(METADATA):
 	@echo "Description:	Test to install xen/kvm guests. Uses libvirt userspace tools." >> $(METADATA)
 	@echo "TestTime:	43200"		>> $(METADATA)
 	@echo "Requires:	$(PACKAGE_NAME)"  >> $(METADATA)
-	@echo "Architectures:	i386 x86_64 ia64" >> $(METADATA)
 	@echo "Priority:	Manual" >> $(METADATA)
 	@echo "Requires:	autofs" >> $(METADATA)
 	@echo "Requires:	bridge-utils" >> $(METADATA)
