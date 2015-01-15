@@ -106,6 +106,7 @@ $(METADATA):
 	@echo "Requires:	python-virtinst" >> $(METADATA)
 	@echo "Requires:	virt-manager" >> $(METADATA)
 	@echo "Requires:	virt-viewer" >> $(METADATA)
+	@echo "Requires:	virt-install" >> $(METADATA)
 	@echo "Requires:	vnc" >> $(METADATA)
 	@echo "Requires:	vnc-server" >> $(METADATA)
 	@echo "Requires:	xen" >> $(METADATA)

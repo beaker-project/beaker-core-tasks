@@ -430,13 +430,19 @@ function rename_current_ifcfg_config()
     return $ret
 }
 
+function isRHEL7()
+{
+    rpm -qa initscripts | grep -q "\.el7"
+    return $?
+}
+
 # Bug 871800 - virt-install with option --vnc fails: qemu-kvm: Could not read keymap file: 'en-us'
 function workaround_bug871800()
 {
-    yum list installed qemu-kvm-common
+    yum list installed "qemu-kvm-common*"
     if [ $? -ne 0 ]; then
         echo "Bug 871800, qemu-kvm-common is not installed, trying to install.." | tee -a $OUTPUTFILE
-        yum -y install qemu-kvm-common >> $OUTPUTFILE 2>&1
+        yum -y install "qemu-kvm-common*" >> $OUTPUTFILE 2>&1
         report_result bug871800 FAIL 1
     fi
 }
@@ -444,6 +450,7 @@ function workaround_bug871800()
 # Bug 901542 - qemu doesn't depend on seabios-bin, resulting in error: "qemu: PC system firmware (pflash) must be a multiple of 0x1000"
 function workaround_bug901542()
 {
+    uname -m | grep -q x86 || return
     yum list installed seabios-bin
     local ret2=$?
     if [ $ret2 -ne 0 ]; then
@@ -560,8 +567,7 @@ function ConfirmDefaultNetDevice ()
 #
 
 # workaround RHEL7 issues
-rpm -qa initscripts | grep "\.el7"
-if [ $? -eq 0 ]; then
+if isRHEL7; then
     workaround_bug871800
     workaround_bug901542
     workaround_bug958860
@@ -1007,7 +1013,19 @@ while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args 
    #CMDLINE="-b xenbr${bridge} -n ${guestname} -f ${IMAGE} $args"
    CMDLINE="--name ${guest_name} --mac ${guest_mac} --location ${guest_loc} $guest_args --debug"
    if [[ ${kvm_num} > 0 ]]; then
-      CMDLINE="${CMDLINE} --extra-args \"ks=$guest_ks serial console=tty0 console=ttyS0,115200\""
+      if uname -m | grep -q ppc; then
+         console_config="console=tty0 console=hvc0"
+      else
+         console_config="console=tty0 console=ttyS0,115200"
+      fi
+      CMDLINE="${CMDLINE} --extra-args \"ks=$guest_ks serial $console_config\""
+
+      # disable vnc on ppc, spapr doesn't support graphics and stdout at the same time
+      # we can't attach to any console: vnc is disabled, and serial console is file,
+      # thus virsh console fails
+      if uname -m | grep -q ppc; then
+         CMDLINE="${CMDLINE} --nographics --noautoconsole --wait -1"
+      fi
    else   
       ## the first 2 conditions are for fedora releases since they too can support xen guests.
       if grep -q -i fedora /etc/fedora-release; then
@@ -1042,11 +1060,17 @@ while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args 
       elif [[ $rc == 3 ]]; then 
          CMDLINE="${CMDLINE} --os-variant=virtio26 "
      fi
+
+     # qemu-kvm-rhev on ppc doesn't support default rtl8139 model name
+     netdev_model=""
+     if uname -m | grep -q ppc; then
+         netdev_model=",model=virtio"
+     fi
      # make an exception for given --network arg..
      # see BZ#821984
      GIVENNW=$(echo $CMDLINE | awk '{ for (i=1;i<=NF;i++) { if ( $i == "--network" ) { i+=1; printf "%s ", $i } else { continue; } } }')
      if [[ -z "${GIVENNW}" ]]; then 
-        CMDLINE="${CMDLINE} --ver6 --network bridge:${brdev} "
+        CMDLINE="${CMDLINE} --ver6 --network bridge:${brdev}${netdev_model} "
      else 
         CMDLINE=$(echo $CMDLINE | awk '{ for (i=1;i<=NF;i++) { if ( $i == "--network" ) { i+=1; continue; } else printf "%s ", $i } }')
         NWARG=""
