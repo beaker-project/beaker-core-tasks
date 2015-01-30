@@ -103,7 +103,6 @@ $(METADATA):
 	@echo "Requires:	mkisofs" >> $(METADATA)
 	@echo "Requires:	openssh-server" >> $(METADATA)
 	@echo "Requires:	python-virtinst" >> $(METADATA)
-	@echo "Requires:	virt-manager" >> $(METADATA)
 	@echo "Requires:	virt-viewer" >> $(METADATA)
 	@echo "Requires:	virt-install" >> $(METADATA)
 	@echo "Requires:	vnc" >> $(METADATA)
