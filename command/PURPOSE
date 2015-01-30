@@ -1,0 +1,3 @@
+This test is to execute any arbitrary command. The command should be
+finished in 180 minutes, which is the default test run time. The command
+needs to return zero in order to pass the test.
