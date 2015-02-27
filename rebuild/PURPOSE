@@ -1,0 +1,3 @@
+This task fetches all SRPMs from a given repo (for example, the sources tree
+for Fedora) and rebuilds them all in mock. This allows for experimental mass
+rebuilds, for example using a newer or modified build toolchain.
