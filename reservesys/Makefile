@@ -20,6 +20,7 @@ METADATA=testinfo.desc
 BUILT_FILES=$(METADATA)
 
 FILES=$(BUILT_FILES) \
+	metadata \
 	runtest.sh   \
 	recipe_status \
 	Makefile

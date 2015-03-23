@@ -1,0 +1,7 @@
+[General]
+name=/distribution/reservesys
+
+[restraint]
+dependencies=emacs;vim-enhanced;MTA;psmisc
+max_time=24h
+no_localwatchdog=true

@@ -3,6 +3,25 @@
 # Source the common test script helpers
 . /usr/bin/rhts_environment.sh
 
+if [ -n "$RSTRNT_JOBID" ]; then
+    # Fill in legacy values
+    export SUBMITTER=$RSTRNT_OWNER
+    export JOBID=$RSTRNT_JOBID
+    export RECIPEID=$RSTRNT_RECIPEID
+    export DISTRO=$RSTRNT_OSDISTRO
+    export ARCH=$RSTRNT_OSARCH
+    export TEST=$RSTRNT_TASKNAME
+    export TESTID=$RSTRNT_TASKID
+    export REBOOTCOUNT=$RSTRNT_REBOOTCOUNT
+    export LAB_CONTROLLER=$BEAKER_LAB_CONTROLLER
+fi
+
+cleanup()
+{
+    kill -9 $1
+    exit 0
+}
+
 STOPRHTS()
 {
     chkconfig rhts
@@ -12,11 +31,6 @@ STOPRHTS()
         /usr/bin/killall rhts-test-runner.sh
     fi
 }
-
-if [ $REBOOTCOUNT -gt 0 ]; then
-    STOPRHTS
-    exit 0
-fi
 
 # Functions
 RprtRslt()
@@ -86,11 +100,16 @@ RETURNSCRIPT()
 {
     SCRIPT=/usr/bin/return2beaker.sh
 
-    echo "#!/bin/sh"                           > $SCRIPT
-    echo "export RESULT_SERVER=$RESULT_SERVER" >> $SCRIPT
-    echo "export TESTID=$TESTID" >> $SCRIPT
-    echo "/usr/bin/rhts-test-update $RESULT_SERVER $TESTID finish" >> $SCRIPT
-    echo "touch /var/cache/rhts/$TESTID/done" >> $SCRIPT
+    if [ -n "$RSTRNT_JOBID" ]; then
+        echo "#!/bin/sh"          > $SCRIPT
+        echo "killall runtest.sh" >> $SCRIPT
+    else
+        echo "#!/bin/sh"                           > $SCRIPT
+        echo "export RESULT_SERVER=$RESULT_SERVER" >> $SCRIPT
+        echo "export TESTID=$TESTID" >> $SCRIPT
+        echo "/usr/bin/rhts-test-update $RESULT_SERVER $TESTID finish" >> $SCRIPT
+        echo "touch /var/cache/rhts/$TESTID/done" >> $SCRIPT
+    fi
     echo "/bin/echo Going on..." >> $SCRIPT
     rm -f /usr/bin/return2rhts.sh &> /dev/null || true
     ln -s $SCRIPT /usr/bin/return2rhts.sh &> /dev/null || true
@@ -163,6 +182,18 @@ return 0
 
 howmany "\$1"
 
+EOF
+
+
+    if [ -n "$RSTRNT_JOBID" ]; then
+cat >> $SCRIPT2 <<-EOF
+export HOSTNAME=$HOSTNAME
+export HARNESS_PREFIX=$HARNESS_PREFIX
+export RSTRNT_RECIPE_URL=$RSTRNT_RECIPE_URL
+rstrnt-adjust-watchdog \$EXTRESTIME
+EOF
+    else
+cat >> $SCRIPT2 <<-EOF
 export RESULT_SERVER=$RESULT_SERVER
 export HOSTNAME=$HOSTNAME
 export JOBID=$JOBID
@@ -173,6 +204,7 @@ rhts-test-checkin $RESULT_SERVER $HOSTNAME $JOBID $TEST \$EXTRESTIME $TESTID
 logger -s "rhts-test-checkin $RESULT_SERVER $HOSTNAME $JOBID $TEST \$EXTRESTIME $TESTID"
 report_result $TEST/extend-test-time PASS \$EXTRESTIME
 EOF
+    fi
 
 chmod 777 $SCRIPT2
 }
@@ -195,7 +227,11 @@ EOF
 
 WATCHDOG()
 {
-    rhts-test-checkin $RESULT_SERVER $HOSTNAME $JOBID $TEST $SLEEPTIME $TESTID
+    if [ -n "$RSTRNT_JOBID" ]; then
+        rstrnt-adjust-watchdog $SLEEPTIME
+    else
+        rhts-test-checkin $RESULT_SERVER $HOSTNAME $JOBID $TEST $SLEEPTIME $TESTID
+    fi
 }
 
 if [ -z "$RESERVETIME" ]; then
@@ -240,32 +276,54 @@ BUILD_()
     RETURNSCRIPT
 }
 
-if [ -n "$RESERVE_IF_FAIL" ]; then
-    # beakerd only re-computes a recipe's overall result every 20 seconds. We 
-    # need a delay here to ensure that the recipe result is up to date before 
-    # we check it. Otherwise we might miss a Fail from the task right before 
-    # this one (its result will remain New until beakerd computes it).
-    sleep 40
-    ./recipe_status
-    if [ $? -eq 0 ]; then
+if [ -n "$REBOOTCOUNT" ]; then
+    if [ $REBOOTCOUNT -eq 0 ]; then
+        if [ -n "$RESERVE_IF_FAIL" ]; then
+            # beakerd only re-computes a recipe's overall result every 20 seconds. We 
+            # need a delay here to ensure that the recipe result is up to date before 
+            # we check it. Otherwise we might miss a Fail from the task right before 
+            # this one (its result will remain New until beakerd computes it).
+            sleep 40
+            ./recipe_status
+            if [ $? -eq 0 ]; then
+                RprtRslt $TEST/RESERVE_SKIP PASS 0
+                exit 0
+            fi
+        fi
+        BUILD_
+        echo "***** End of reservesys test *****" >> $OUTPUTFILE
         RprtRslt $TEST PASS 0
-        exit 0
     fi
 fi
 
-BUILD_
 
-echo "***** End of reservesys test *****" >> $OUTPUTFILE
-RprtRslt $TEST PASS 0
+if [ -n "$RSTRNT_JOBID" ]; then
+    # RSTRNT_JOBID is defined which means we are running in restraint
 
-# stop rhts service, So that reserve workflow works with test reboot support.
-STOPRHTS
+    if [ -n "RSTRNT_PORT" ]; then
+        # If RSTRNT_PORT is defined then run another version
+        # of restraint on this port for test development
+        restraintd --port $RSTRNT_PORT &
+        pid=$!
 
-# harnesses other than beah may cause this script to nominally fail (e.g.
-# failing to stop rhts, since other harnesses may not have such a thing),
-# so we force the script to always return zero
-#
-# this means that including /distribution/reservesys in a recipe should
-# never change the overall result, even if helper commands that assume beah
-# as the harness fail
+        trap "cleanup $pid" 15
+    fi
+
+    # We stay running in restraint..
+    while (true); do
+        sleep 5
+    done
+else
+    # stop rhts service, So that reserve workflow works with test reboot support.
+    STOPRHTS
+
+    # harnesses other than beah may cause this script to nominally fail (e.g.
+    # failing to stop rhts, since other harnesses may not have such a thing),
+    # so we force the script to always return zero
+    #
+    # this means that including /distribution/reservesys in a recipe should
+    # never change the overall result, even if helper commands that assume beah
+    # as the harness fail
+fi
+
 exit 0
