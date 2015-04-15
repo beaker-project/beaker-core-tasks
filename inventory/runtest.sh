@@ -47,14 +47,15 @@ rlJournalStart
     rlPhaseEnd
 
     rlPhaseStart WARN check_virt_enabled
+        #https://bugzilla.redhat.com/show_bug.cgi?id=738881
         if journalctl --dmesg &>/dev/null ; then
             # systemd journal
-            if journalctl --dmesg | grep "kvm.*disabled" ; then
+            if journalctl --dmesg | grep "kvm: disabled by bios" ; then
                 kvm_disabled=1
             fi
         else
             # syslog
-            if grep "kvm.*disabled" /var/log/messages ; then
+            if grep "kvm: disabled by bios" /var/log/messages ; then
                 kvm_disabled=1
             fi
         fi
