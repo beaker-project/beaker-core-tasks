@@ -35,7 +35,7 @@ if len(sys.argv) >= 2 and sys.argv[1] == '--kvm-num': # this is kind of a hack..
     sys.exit(0)
 
 for guestrecipe in doc.getElementsByTagName('guestrecipe'):
-    print ' '.join([
+    print '\t'.join([
         guestrecipe.getAttribute('id') or 'RECIPEIDMISSING',
         guestrecipe.getAttribute('guestname')
             or 'guestrecipe%s' % guestrecipe.getAttribute('id'),
@@ -43,4 +43,5 @@ for guestrecipe in doc.getElementsByTagName('guestrecipe'):
         guestrecipe.getAttribute('location') or 'LOCATIONMISSING',
         guestrecipe.getAttribute('kickstart_url') or 'KSMISSING',
         guestrecipe.getAttribute('guestargs'),
+        guestrecipe.getAttribute('kernel_options'),
     ])

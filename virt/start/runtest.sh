@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Source the common test script helpers
 . /usr/bin/rhts_environment.sh
@@ -101,7 +101,8 @@ fi
 
 
 if [[ -z $GUESTSTART_ARGS ]]; then
-   get_guest_info.py | while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args ; do
+   get_guest_info.py | while IFS=$'\t' read guest_recipeid guest_name guest_mac \
+	   guest_loc guest_ks guest_args guest_kernel_options; do
       if [ -z $guest_name ]; then
          echo "No guestname can be found"
          report_result ${TEST}_noguestname FAIL 1

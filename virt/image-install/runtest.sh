@@ -884,7 +884,8 @@ echo "Guests info:" | tee -a $OUTPUTFILE
 cat ./tmp.guests | tee -a $OUTPUTFILE
 
 # go thru the guests and set up console sniff/upload 
-while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args ; do
+while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
+	guest_args guest_kernel_options; do
    if ! mkdir -p $(pwd)/guests/${guest_name}/logs; then
       report_result ${TEST}_cant_create_dirs FAIL 10
    fi
@@ -915,14 +916,16 @@ if setupconsolelogs; then
    cat /var/log/logguestconsoles.* | tee -a $OUTPUTFILE
 fi
 
-while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args ; do
+while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
+	guest_args guest_kernel_options; do
    DeBug "guest is :
         guest_recipeid=$guest_recipeid
         guest_name=$guest_name
         guest_mac=$guest_mac
         guest_loc=$guest_loc
         guest_ks=$guest_ks
-        guest_args=$guest_args"
+        guest_args=$guest_args
+        guest_kernel_options=$guest_kernel_options"
    if [ -z "$guest_name" ] ; then
       echo "get_guest_info.py did not return a guest name"
       report_result ${TEST}_no_guestname FAIL 10

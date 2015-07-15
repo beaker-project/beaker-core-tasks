@@ -933,7 +933,8 @@ echo "Guests info:" | tee -a $OUTPUTFILE
 cat ./tmp.guests | tee -a $OUTPUTFILE
 
 # go thru the guests and set up console sniff/upload 
-while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args ; do
+while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
+	guest_args guest_kernel_options; do
    if ! mkdir -p $(pwd)/guests/${guest_name}/logs; then
       report_result ${TEST}_cant_create_dirs FAIL 10
    fi
@@ -964,14 +965,16 @@ if setupconsolelogs; then
    cat /var/log/logguestconsoles.* | tee -a $OUTPUTFILE
 fi
 
-while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args ; do
+while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
+	guest_args guest_kernel_options; do
    DeBug "guest is :
         guest_recipeid=$guest_recipeid
         guest_name=$guest_name
         guest_mac=$guest_mac
         guest_loc=$guest_loc
         guest_ks=$guest_ks
-        guest_args=$guest_args"
+        guest_args=$guest_args
+        guest_kernel_options=$guest_kernel_options"
    if [ -z "$guest_name" ] ; then
       echo "get_guest_info.py did not return a guest name"
       report_result ${TEST}_no_guestname FAIL 10
@@ -1012,13 +1015,14 @@ while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args 
    #bridge=$(ip route list | awk '/^default / { print $NF }' | sed 's/^[^0-9]*//')
    #CMDLINE="-b xenbr${bridge} -n ${guestname} -f ${IMAGE} $args"
    CMDLINE="--name ${guest_name} --mac ${guest_mac} --location ${guest_loc} $guest_args --debug"
+   EXTRA_ARGS=""
    if [[ ${kvm_num} > 0 ]]; then
       if uname -m | grep -q ppc; then
          console_config="console=tty0 console=hvc0"
       else
          console_config="console=tty0 console=ttyS0,115200"
       fi
-      CMDLINE="${CMDLINE} --extra-args \"ks=$guest_ks serial $console_config\""
+      EXTRA_ARGS="ks=$guest_ks serial $console_config"
 
       # disable vnc on ppc, spapr doesn't support graphics and stdout at the same time
       # we can't attach to any console: vnc is disabled, and serial console is file,
@@ -1029,10 +1033,11 @@ while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args 
    else   
       ## the first 2 conditions are for fedora releases since they too can support xen guests.
       if grep -q -i fedora /etc/fedora-release; then
-         CMDLINE="${CMDLINE} --extra-args \"ks=$guest_ks serial\" --serial file,path=$(pwd)/guests/${guest_name}/logs/${guest_name}_console.log --serial pty --console pty "
+         EXTRA_ARGS="ks=$guest_ks serial"
+         CMDLINE="${CMDLINE} --serial file,path=$(pwd)/guests/${guest_name}/logs/${guest_name}_console.log --serial pty --console pty"
          CMDLINE="${CMDLINE} --nographics"
       else
-         CMDLINE="${CMDLINE} --extra-args ks=$guest_ks"
+         EXTRA_ARGS="ks=$guest_ks"
       fi
 
    fi
@@ -1086,7 +1091,7 @@ while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args 
             fi
         done
 
-        CMDLINE=$(echo ${CMDLINE} | sed -e 's/--extra-args "/--extra-args "ksdevice=eth0 /')
+        EXTRA_ARGS="ksdevice=eth0 $EXTRA_ARGS"
         CMDLINE="${CMDLINE} --ver6 ${NWARG}"
         
      fi
@@ -1112,6 +1117,9 @@ while read -r guest_recipeid guest_name guest_mac guest_loc guest_ks guest_args 
         fi 
      fi
    fi
+
+   # add all kernel options to virt-install command-line
+   CMDLINE="${CMDLINE} --extra-args \"$EXTRA_ARGS $guest_kernel_options\""
 
    # temporary workaround for not having diskimage passed on to virt-install
    # see bz 729608
