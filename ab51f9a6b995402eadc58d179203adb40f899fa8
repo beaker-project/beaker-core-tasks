@@ -1,0 +1,8 @@
+Code-Review+1: Dan Callaghan <dcallagh@redhat.com>
+Code-Review+2: Matt Jia <mjia@redhat.com>
+Verified+1: Dan Callaghan <dcallagh@redhat.com>
+Submitted-by: Dan Callaghan <dcallagh@redhat.com>
+Submitted-at: Fri, 24 Jul 2015 01:49:10 +0000
+Reviewed-on: http://gerrit.beaker-project.org/4297
+Project: beaker-core-tasks
+Branch: refs/heads/master
