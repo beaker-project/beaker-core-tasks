@@ -162,6 +162,9 @@ SysReport ()
 	cp /root/anaconda-ks.cfg $FILEAREA/anaconda-ks.cfg
 	rhts_submit_log -S $RESULT_SERVER -T $TESTID -l $FILEAREA/anaconda-ks.cfg
     fi
+    if [ -e /root/anaconda.coverage ]; then
+	rhts_submit_log -S $RESULT_SERVER -T $TESTID -l /root/anaconda.coverage
+    fi
     if [ -e /root/install_kernel.log ]; then
 	cp /root/install_kernel.log $FILEAREA/install_kernel.log
 	syskerror=$(/bin/grep -i error: $FILEAREA/install_kernel.log >> $FILEAREA/kerror.log)
