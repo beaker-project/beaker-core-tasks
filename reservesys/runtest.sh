@@ -103,6 +103,11 @@ EXTENDTESTTIME()
 SCRIPT2=/usr/bin/extendtesttime.sh
 
 cat > $SCRIPT2 <<-EOF
+#!/bin/sh
+
+# Source the common test script helpers
+. /usr/bin/rhts_environment.sh
+
 howmany()
 {
 if [ -n "\$1" ]; then
@@ -163,8 +168,10 @@ export HOSTNAME=$HOSTNAME
 export JOBID=$JOBID
 export TEST=$TEST
 export TESTID=$TESTID
+export RECIPETESTID=$TESTID
 rhts-test-checkin $RESULT_SERVER $HOSTNAME $JOBID $TEST \$EXTRESTIME $TESTID
 logger -s "rhts-test-checkin $RESULT_SERVER $HOSTNAME $JOBID $TEST \$EXTRESTIME $TESTID"
+report_result $TEST/extend-test-time PASS \$EXTRESTIME
 EOF
 
 chmod 777 $SCRIPT2
