@@ -241,6 +241,11 @@ BUILD_()
 }
 
 if [ -n "$RESERVE_IF_FAIL" ]; then
+    # beakerd only re-computes a recipe's overall result every 20 seconds. We 
+    # need a delay here to ensure that the recipe result is up to date before 
+    # we check it. Otherwise we might miss a Fail from the task right before 
+    # this one (its result will remain New until beakerd computes it).
+    sleep 40
     ./recipe_status
     if [ $? -eq 0 ]; then
         RprtRslt $TEST PASS 0
