@@ -482,84 +482,126 @@ function workaround_bug957897()
     fi
 }
 
-function ConfirmDefaultNetDevice ()
+function XENbridge ()
+{
+    Debug "Enter XENbridge"
+
+    echo "" >> $OUTPUTFILE
+    echo "***** INFO: RHEL5 configuring the XEN bridge with correct network device" >> $OUTPUTFILE
+
+    local xen_netdev="$1"
+    local xen_script="/etc/xen/scripts/network-xenbridge"
+    local xen_config="/etc/xen/xend-config.sxp"
+    local run_script="/etc/xen/scripts/network-bridge"
+
+    # set the correct network device for the bridge
+    local bridge=$(echo ${xen_netdev} | sed 's/^[^0-9]*//')
+    local xen_bridge="xenbr${bridge}"
+
+    # comment out the default script (network-script network-bridge)
+    # add line to $xen_config file that will run the script required
+    # to build the XEN bridge using the correct network device
+    sed -i "s/^(network-script network-bridge)/## (network-script network-bridge)/" $xen_config
+    sed -i "/^## (network-script network-bridge)/a (network-script 'network-xenbridge netdev=$xen_netdev bridge=$xen_bridge')" $xen_config
+
+    # create script to build the XEN bridge with correct network device on boot
+    cat >> $xen_script <<EOF
+#!/bin/sh
+# /etc/xen/scripts/network-xenbridge
+# RHEL5 last network device up is default network device
+/sbin/ifdown $xen_netdev
+/sbin/ifup $xen_netdev
+# Build the xen bridge
+$run_script start netdev=$xen_netdev bridge=$xen_bridge
+exit
+EOF
+
+    if [ ! -e $xen_script ]; then
+        echo "" >> $OUTPUTFILE
+        echo "***** FAIL: unable to create $xen_script" >> $OUTPUTFILE
+        echo "" >> $OUTPUTFILE
+        report_result ${TEST}_XENbridge FAIL
+    fi
+
+    # our script need be executable
+    chmod +x $xen_script
+    if [ "$?" -ne "0" ]; then
+        echo "" >> $OUTPUTFILE
+        echo "***** FAIL: chmod +x $xen_script" >> $OUTPUTFILE
+        echo "" >> $OUTPUTFILE
+        report_result ${TEST}_XENbridge FAIL
+    fi
+
+    # system is rebooted by design in main
+    echo "***** configuration of XEN bridge complete" >> $OUTPUTFILE
+    echo "***** reboot is required" >> $OUTPUTFILE
+
+    Debug "Exit XENbridge"
+}
+
+function ConfirmXenNetDevices ()
 {
     # RHEL5 brings up all the network devices and sets
     # the last network device to come up as the default.
-    # ConfirmDefaultNetDevice: 
+    # ConfirmXenNetDevices:
     # Confirms the network installation device 
     # is set as the default network device.
-    # This is required for proper network bridging on guests.
+    # This is required for proper network bridging on XEN guests.
 
-    # Run for RHEL5 only
+    DeBug "Enter ConfirmXenNetDevices"
+
+    # run for RHEL5 only
     local rhel5_ver="2.6.18"
     local kernel_ver=`rpm -q --queryformat '%{version}\n' -qf /boot/config-$(uname -r)`
 
     if [ "$rhel5_ver" == "$kernel_ver" ]; then
         echo "" >> $OUTPUTFILE
-        echo "***** RHEL5: Verifying the the network installation device is set as the default network device  *****" >> $OUTPUTFILE
+        echo "***** INFO: RHEL5 verifying the the network installation device is set as the default network device" >> $OUTPUTFILE
 
         if [ ! -e /root/anaconda-ks.cfg ]; then
             echo "" >> $OUTPUTFILE
-            echo "***** WARN: /root/anaconda-ks.cfg file is missing *****" >> $OUTPUTFILE
-            echo "***** WARN: Unable to confirm system network installation device *****" >> $OUTPUTFILE
+            echo "***** WARN: /root/anaconda-ks.cfg file is missing" >> $OUTPUTFILE
             echo "" >> $OUTPUTFILE
-            report_result ${TEST}_ConfirmDefaultNetDevice WARN
+            report_result ${TEST}_ConfirmXenNetDevices WARN
         else
             echo "" >> $OUTPUTFILE
-            echo "***** Confirming system network installation device *****" >> $OUTPUTFILE
-            echo "***** Checking /root/anaconda-ks.cfg *****" >> $OUTPUTFILE
-
-            grep "network --device" /root/anaconda-ks.cfg
-            if [ "$?" -ne "0" ]; then
-                echo "***** WARN: Unable to confirm system network installation device *****" >> $OUTPUTFILE
-                report_result ${TEST}_ConfirmDefaultNetDevice WARN
+            echo "***** confirming system network installation device" >> $OUTPUTFILE
+            echo "***** checking /root/anaconda-ks.cfg" >> $OUTPUTFILE
+            local installdev=$(grep -oP "(?<=--device )[^ ]+" /root/anaconda-ks.cfg)
+            # are you NULL
+            if [ "x${installdev}" == "x" ]; then
+                echo "" >> $OUTPUTFILE
+                echo "***** WARN: unable to confirm system network installation device" >> $OUTPUTFILE
+                report_result ${TEST}_ConfirmXenNetDevices WARN
             else
-                # Get system network installation device
-                local installdev=$(grep -oP "(?<=--device )[^ ]+" /root/anaconda-ks.cfg)
-                if [ "$?" -eq "0" ]; then
-                    echo "***** System network installation device = $installdev *****" >> $OUTPUTFILE
+                echo "***** system network installation device = $installdev" >> $OUTPUTFILE
+                echo "" >> $OUTPUTFILE
+                echo "***** confirming system default network device" >> $OUTPUTFILE
+                echo "***** checking route" >> $OUTPUTFILE
+                # get systems current default network device
+                local defaultdev=$(route | grep default | awk '{print $NF}')
+                echo "***** default network device = $defaultdev" >> $OUTPUTFILE
+                # confirm install and default network device are the same device
+                if [ "$installdev" != "$defaultdev" ]; then
                     echo "" >> $OUTPUTFILE
-                    echo "***** Confirming system default network device *****" >> $OUTPUTFILE
-                    echo "***** Checking route *****" >> $OUTPUTFILE
-                    # Get systems current default network device
-                    local defaultdev=$(route | grep default | awk '{print $NF}')
-                    if [ "$?" -eq "0" ]; then
-                        echo "***** Default network device = $defaultdev *****" >> $OUTPUTFILE
-                        # Confirm install and default network device are the same device
-                        if [ "$installdev" != "$defaultdev" ]; then
-                            echo "***** The install and default network devices are not the same device *****" >> $OUTPUTFILE
-                            echo "*****   As RHEL5 sets the last device that comes up to the default,   *****" >> $OUTPUTFILE
-                            echo "***** its likely this system has multiple nics up on the same subnet  *****" >> $OUTPUTFILE
-                            echo "" >> $OUTPUTFILE
-                            echo "***** Setting $installdev to default network device *****" >> $OUTPUTFILE
-
-                            # This trick will make the $installdev the last network device to come up
-                            # Thus, resetting the RHEL5 default network device
-                            ifdown "$installdev"
-                            sleep 3
-                            ifup "$installdev"
-
-                            # One last check
-                            if [ "$installdev" -ne "$defaultdev" ]; then
-                                echo "***** WARN: Unable to set $installdev to default network device *****" >> $OUTPUTFILE
-                                report_result ${TEST}_ConfirmDefaultNetDevice WARN
-                            else
-                                echo "***** $installdev successfully set to default network device *****" >> $OUTPUTFILE
-                                echo "" >> $OUTPUTFILE
-                            fi
-                        else
-                            echo "***** System installation and default default network device = $defaultdev *****" >> $OUTPUTFILE
-                            echo "" >> $OUTPUTFILE
-                        fi
-                    else
-                        echo "***** WARN: Unable to confirm default network device *****" >> $OUTPUTFILE
-                        report_result ${TEST}_ConfirmDefaultNetDevice WARN
-                    fi
+                    echo "***** install and default network devices are not the same device" >> $OUTPUTFILE
+                    echo "***** RHEL5 sets the last device that comes up to the default," >> $OUTPUTFILE
+                    echo "***** its likely this system has multiple nics up on the same subnet" >> $OUTPUTFILE
+                    echo "" >> $OUTPUTFILE
+                    echo "***** setting $installdev to default network device and" >> $OUTPUTFILE
+                    echo "***** rebuilding the xen bridge with $installdev" >> $OUTPUTFILE
+                    # rebuild the xenbridge with $installdev for our testing
+                    XENbridge $installdev
+                else
+                    echo "" >> $OUTPUTFILE
+                    echo "***** system installation device and default network device = $defaultdev" >> $OUTPUTFILE
+                    echo "" >> $OUTPUTFILE
                 fi
             fi
         fi
     fi
+
+    DeBug "Exit ConfirmXenNetDevices"
 }
 
 #
@@ -772,13 +814,8 @@ EOF
       fi
 
     else
-
-         ## we need to configure/add bridge to establish bridged networking for 
-         ## kvm guests
-
-         # For RHEL5 before we establish a network bridge device
-         # Lets confirm the default network device is correct
-         ConfirmDefaultNetDevice
+         # we need to configure/add bridge to establish bridged networking for 
+         # kvm guests
 
          def_line=$(ip route list | grep ^default)
          defnum=$(perl -e 'for ($i=0; $i<$#ARGV; $i++ ) { if ($ARGV[$i] eq "dev" ) { $_ = $ARGV[ $i + 1 ]; if ( /^(\w*)(\d+)/ ) { print "$_ $2"; } } }' ${def_line} )
@@ -847,15 +884,31 @@ else # this is a xen install
    if [[ $REBOOTCOUNT == 0 ]]; then 
       perl -pi.bak -e 's/#*\(enable-dump\s+no\)/(enable-dump yes)/g' /etc/xen/xend-config.sxp 
       perl -pi.bak -e 's/^#*XENCONSOLED_LOG_HYPERVISOR=no/XENCONSOLED_LOG_HYPERVISOR=yes/g;s/^#*XENCONSOLED_LOG_GUESTS=no/XENCONSOLED_LOG_GUESTS=yes/g;s/^#*XENCONSOLED_LOG_DIR=.*$/XENCONSOLED_LOG_DIR=\/var\/log\/xen\/console/g' /etc/sysconfig/xend
-      echo "Reboot needed to enable xen logging" >> $OUTPUTFILE
+
+      echo "" >> $OUTPUTFILE
+      echo "***** brctl before reboot" >> $OUTPUTFILE
+      brctl show >> $OUTPUTFILE
+
+      # RHEL5 confirm the default network device is correct
+      # rebuild the xen bridge, if we are not using correct default
+      ConfirmXenNetDevices
+
+      echo "" >> $OUTPUTFILE
+      echo "***** reboot needed to enable xen logging and confirm xen bridge" >> $OUTPUTFILE
+
       report_result rhts-reboot PASS $REBOOTCOUNT
       rhts-reboot
    else
-      echo "Reboot was successful" >> $OUTPUTFILE
+      echo "" >> $OUTPUTFILE
+      echo "***** reboot was successful" >> $OUTPUTFILE
 
-       # For RHEL5 before we establish a network bridge device
-       # Lets confirm the default network device is correct
-       ConfirmDefaultNetDevice
+      echo "" >> $OUTPUTFILE
+      echo "***** brctl after reboot" >> $OUTPUTFILE
+      brctl show >> $OUTPUTFILE
+
+      # xen: make sure we pass  --bridge  into the command line for the xen guest installs
+      bridge=$(ip route list | awk '/^default / { print $NF }' | sed 's/^[^0-9]*//')
+      XENBR_ADD="--bridge=xenbr${bridge}"
    fi
   
    # are we running on a Xen kernel in domain 0 ?
@@ -879,6 +932,7 @@ if ! rpm -q libvirt-devel; then
     fi
 fi
 
+echo "" >> $OUTPUTFILE
 echo "***********************" >> $OUTPUTFILE 
 echo "* SELinux Status      *" >> $OUTPUTFILE 
 echo "***********************" >> $OUTPUTFILE 
@@ -1012,9 +1066,8 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
       home_basedir=1
    fi
 
-   #bridge=$(ip route list | awk '/^default / { print $NF }' | sed 's/^[^0-9]*//')
-   #CMDLINE="-b xenbr${bridge} -n ${guestname} -f ${IMAGE} $args"
-   CMDLINE="--name ${guest_name} --mac ${guest_mac} --location ${guest_loc} $guest_args --debug"
+   # Add correct  --bridge  to the command line for the xen guest installs
+   CMDLINE="${XENBR_ADD} --name ${guest_name} --mac ${guest_mac} --location ${guest_loc} $guest_args --debug"
    EXTRA_ARGS=""
    if [[ ${kvm_num} > 0 ]]; then
       if uname -m | grep -q ppc; then
