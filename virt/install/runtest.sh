@@ -436,6 +436,20 @@ function isRHEL7()
     return $?
 }
 
+# Bug 1292921 - [BUG] /etc/xen/scripts/block remove fails - causes loopback exhaustion
+function workaround_bug1292921()
+{
+    if ! grep -q "options loop max_loop=" /etc/modprobe.conf; then
+        echo "options loop max_loop=64" >> /etc/modprobe.conf
+        if ! cat /proc/modules  | awk '{ print $1 }' | grep ^loop$; then
+            rmmod loop
+            modprobe loop
+        fi
+        # log it but don't warn or fail because of it.
+        report_result bug1292921 PASS 0
+    fi
+}
+
 # Bug 871800 - virt-install with option --vnc fails: qemu-kvm: Could not read keymap file: 'en-us'
 function workaround_bug871800()
 {
@@ -607,6 +621,11 @@ function ConfirmXenNetDevices ()
 #
 # ---------- Start Test -------------
 #
+
+# wordaround RHEL5 issues
+if rlIsRHEL 5 && uname -r  | grep -q xen; then
+    workaround_bug1292921
+fi
 
 # workaround RHEL7 issues
 if isRHEL7; then
