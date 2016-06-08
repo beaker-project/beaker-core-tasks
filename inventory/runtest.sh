@@ -33,6 +33,7 @@ rlJournalStart
         rlRun "modprobe kvm" 0,1
 	rlRun "modprobe kvm_amd" 0,1
 	rlRun "modprobe kvm_intel" 0,1
+        rlRun "modprobe kvm_hv" 0,1
         # sg module may not be loaded by default, but lshw relies on /dev/sg*
         # device nodes for scanning SCSI devices
         # https://bugzilla.redhat.com/show_bug.cgi?id=1193817
