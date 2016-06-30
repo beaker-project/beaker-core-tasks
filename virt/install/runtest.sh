@@ -360,6 +360,18 @@ function setupconsolelogs()
 		let "FAIL=${FAIL}+1"
 	fi
 
+	# libvirt introduced rotating logs at the end of 2015
+	# This breaks logguestconsoles, because it keeps checking fd
+	# that is no longer getting any updates.
+	grep -q "stdio_handler =" /etc/libvirt/qemu.conf
+	if [ $? -eq 0 ]; then
+		# comment any current setting
+		sed -i 's/\(^stdio_handler =.*\)/#\1/' /etc/libvirt/qemu.conf
+		# and use non-rotating logs
+		echo 'stdio_handler = "file"' >> /etc/libvirt/qemu.conf
+		restorecon /etc/libvirt/qemu.conf
+	fi
+
 	if [[ ${FAIL} > 0 ]]; then 
 		report_result ${TEST}_consolelogsetup WARN $FAIL
         	return 1
