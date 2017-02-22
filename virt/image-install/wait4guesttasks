@@ -154,7 +154,7 @@ while len(tasks_dict) > 0:
 				print errors 
 			sys.exit(5)
 
-	recipe_xml = proxy.get_my_recipe(dict(recipe_id=os.environ['RECIPEID']))
+	recipe_xml = proxy.get_my_recipe(dict(recipe_id=guestrecipe))
 	doc = xml.dom.minidom.parseString(recipe_xml)
 
 	for xmltasks in doc.getElementsByTagName('task'):
