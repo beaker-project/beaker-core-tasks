@@ -1103,6 +1103,8 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
    if [[ ${kvm_num} > 0 ]]; then
       if uname -m | grep -q ppc; then
          console_config="console=tty0 console=hvc0"
+      elif uname -m | grep -q aarch64; then
+	 console_config=""
       else
          console_config="console=tty0 console=ttyS0,115200"
       fi
@@ -1112,6 +1114,8 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
       # we can't attach to any console: vnc is disabled, and serial console is file,
       # thus virsh console fails
       if uname -m | grep -q ppc; then
+         CMDLINE="${CMDLINE} --nographics --noautoconsole --wait -1"
+      elif uname -m | grep -q aarch64; then
          CMDLINE="${CMDLINE} --nographics --noautoconsole --wait -1"
       fi
    else   
