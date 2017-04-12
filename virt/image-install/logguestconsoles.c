@@ -236,6 +236,18 @@ startelement(void *user_data, const xmlChar *name, const xmlChar **atts)
 	}
 	return;
 }
+
+static inline int add_infile_watch(int inotify_fd, char *infilename)
+{
+	int wd = inotify_add_watch(inotify_fd, infilename,
+		IN_MODIFY | IN_CLOSE_WRITE | IN_CLOSE_NOWRITE | IN_ATTRIB);
+
+	if (wd < 0)
+		DEBUG0("cannot add watch for %s file", infilename);
+
+	return wd;
+}
+
 /*
  * reads config file which has the original console log file name per line
  */
@@ -369,11 +381,10 @@ static int read_config_file(int inotify_fd, const char *configfile ) {
 			perror("Error mallocing for newrecord: ");
 			return 1;
 		}
-		wd = inotify_add_watch (inotify_fd, infilename, IN_MODIFY|IN_CLOSE_WRITE|IN_CLOSE_NOWRITE);
-		if ( wd < 0 ) {
-			perror("Error in inotify_add_watch in __FUNC__ ");
+		wd = add_infile_watch(inotify_fd, infilename);
+		if (wd < 0)
 			return 1;
-		}
+
 		fprintf(stdout, "added file %s of recipe %ld for  %s to descriptor %d \n", infilename, recipe_id, outfilename, inotify_fd);
 		fprintf(stdout, "in_fd %d , outfd: %d \n", in_fd, out_fd );
 		fflush(stdout);
@@ -574,7 +585,8 @@ int prepare_and_upload(file_record_ptr therecord) {
 	memset(read_buf, '\0', read_size+1);
 	fp = fopen(filename, "r");
 	if(!fp) {
-		perror("Error opening file in __FUNC__ :");
+		DEBUG0("Error opening file %s - %d: %s", filename, errno,
+				strerror(errno));
 		return 1;
 	}
 
@@ -935,8 +947,50 @@ int main(int argc, char *argv[], char *envp[]) {
 				}
 			} else if ((event->mask & IN_CLOSE_WRITE) || (event->mask & IN_CLOSE_NOWRITE) ) {
 				prepare_and_upload(el);
-			} 
+			} else if ((event->mask & IN_ATTRIB)) {
+				struct stat sb;
 
+				if (fstat(el->in_fd, &sb) == -1) {
+					DEBUG0("cannot fstat() - %d: %s",
+						errno, strerror(errno));
+					/* continue with next event */
+					continue;
+				}
+				if (sb.st_nlink != 0) {
+					DEBUG0("infile ref count is %ld not 0",
+							(long) sb.st_nlink);
+					/* continue with next event */
+					continue;
+				}
+
+				/* don't check result, file may have been
+				 * deleted for a while
+				 */
+				inotify_rm_watch(inotify_fd, el->wd);
+
+				close(el->in_fd);
+
+				el->in_fd = open(el->infilename,
+						O_RDONLY | O_CREAT, 0777);
+				if (el->in_fd < 0) {
+					DEBUG0("cannot open file %s - %d: %s",
+						el->infilename, errno,
+						strerror(errno));
+
+					return 1;
+				}
+
+				el->wd = add_infile_watch(inotify_fd,
+						el->infilename);
+
+				if (el->wd < 0)
+					return 1;
+
+				/* skip next iteration, don't care for events
+				 * of deleted old file
+				 */
+				break;
+			}
 		}
 		bzero(&events[0],EVENT_SIZE);
 	}
