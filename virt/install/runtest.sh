@@ -370,6 +370,7 @@ function setupconsolelogs()
 		# and use non-rotating logs
 		echo 'stdio_handler = "file"' >> /etc/libvirt/qemu.conf
 		restorecon /etc/libvirt/qemu.conf
+		service libvirtd restart
 	fi
 
 	if [[ ${FAIL} -gt 0 ]]; then
