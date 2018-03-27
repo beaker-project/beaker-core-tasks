@@ -997,22 +997,6 @@ if [[ $REBOOTCOUNT -gt 1 ]]; then
    exit 0
 fi
 
-## for virtinst => 0.400 we need to add --prompt argument to have virt-install
-# interactively ask questions for the arguments it lacks.. 
-promptreq=0
-virtinst_ver=$(rpm --qf '%{version}\n' -qf $(which virt-install))
-if [ -z ${virtinst_ver} ]; then 
-	echo "can't determine the version of python-virtinst package!!!"
-	report_result ${TEST}_setup FAIL 1
-fi
-major=$(echo ${virtinst_ver} | awk -F. '{print $1}')
-minor=$(echo ${virtinst_ver} | awk -F. '{print $2}')
-# version 0.400.x has --prompt
-if [[ ${major} -gt 0 ]]; then 
-	promptreq=1
-elif [[ ${minor} -ge 400 ]]; then 
-	promptreq=1
-fi
 i=0
 fail=0
 
@@ -1131,14 +1115,6 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
          EXTRA_ARGS="ks=$guest_ks"
       fi
 
-   fi
-   if [[ ${promptreq} -eq 1 ]]; then
-      CMDLINE="${CMDLINE} --prompt"
-      # newer libvirt also doesn't ask for vnc or nographics, it defaults 
-      # to whatever is available
-      if echo ${CMDLINE} | egrep -q " --paravirt|^--paravirt| -p |^-p|-p$"; then
-         CMDLINE="${CMDLINE} --nographics"
-      fi
    fi
 
    # kvm guest should have --accelerate and --os-variant=virtio26 by default.
