@@ -334,7 +334,7 @@ function setupconsolelogs()
 {
 	local RESULT="PASS"
 	local FAIL=0
-	if ! gcc -g -Wall logguestconsoles.c -o logguestconsoles -lssl -lcrypto -lcurl $(xmlrpc-c-config client --libs) $(pkg-config libvirt --libs) $(xml2-config --cflags) $(xml2-config --libs); then 
+	if ! gcc -g -Wall logguestconsoles.c -o logguestconsoles -lssl -lcrypto -lcurl $(xmlrpc-c-config client --libs) -lxmlrpc_util $(pkg-config libvirt --libs) $(xml2-config --cflags) $(xml2-config --libs); then
 		echo "Problem with compiling logguestconsoles.c file"
 		echo "Guest console logs won't be available"
 		RESULT="FAIL"

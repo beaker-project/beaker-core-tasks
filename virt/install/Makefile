@@ -96,6 +96,7 @@ $(METADATA):
 	@echo "Requires:	autofs" >> $(METADATA)
 	@echo "Requires:	bridge-utils" >> $(METADATA)
 	@echo "Requires:	expect" >> $(METADATA)
+	@echo "Requires:	gcc" >> $(METADATA)
 	@echo "Requires:	genisoimage" >> $(METADATA)
 	@echo "Requires:	kernel-xen"  >> $(METADATA)
 	@echo "Requires:	kvm"            >> $(METADATA)

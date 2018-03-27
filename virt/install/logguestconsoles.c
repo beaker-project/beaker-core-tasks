@@ -541,7 +541,7 @@ int prepare_and_upload(file_record_ptr therecord) {
 	size_t read_rc;
 	int i = 0;
 	/* md5 stuff */
-   EVP_MD_CTX mdctx;
+   EVP_MD_CTX *mdctx;
    const EVP_MD *md;
    unsigned char md_value[EVP_MAX_MD_SIZE];
 	char md_hexdigest[EVP_MAX_MD_SIZE*2];
@@ -673,11 +673,20 @@ int prepare_and_upload(file_record_ptr therecord) {
 	outstream[outlen] = '\0';
 
 	/* md5 hashsum of the blob */
-   EVP_MD_CTX_init(&mdctx);
-   EVP_DigestInit_ex(&mdctx, md, NULL);
-   EVP_DigestUpdate(&mdctx, read_buf, read_size);
-   EVP_DigestFinal_ex(&mdctx, md_value, &md_len);
-   EVP_MD_CTX_cleanup(&mdctx);
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+   mdctx = EVP_MD_CTX_new();
+#else
+   mdctx = malloc(sizeof(*mdctx));
+#endif
+   EVP_MD_CTX_init(mdctx);
+   EVP_DigestInit_ex(mdctx, md, NULL);
+   EVP_DigestUpdate(mdctx, read_buf, read_size);
+   EVP_DigestFinal_ex(mdctx, md_value, &md_len);
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+   EVP_MD_CTX_free(mdctx);
+#else
+   free(mdctx);
+#endif
 
    for(i = 0, j = 0; i < md_len; i++){
 		sprintf(&md_hexdigest[j], "%02x", md_value[i]);
