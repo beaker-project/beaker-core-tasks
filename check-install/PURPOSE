@@ -1,0 +1,8 @@
+Performs some sanity checks about the operating system installation which was
+done at the start of the recipe. Also reports various facts about the state and
+configuration of the system which might be useful in debugging installation
+problems.
+
+This task is intended to be included as the first task in every Beaker recipe.
+It replaces the /distribution/install task which was previously used for this
+purpose.
