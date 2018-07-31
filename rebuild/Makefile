@@ -18,6 +18,7 @@ $(METADATA):
 	@echo "Description:     Rebuilds all distribution packages using mock. For testing mass rebuilds." >>$(METADATA)
 	@echo "TestTime:        259200" >>$(METADATA)
 	@echo "Priority:        Manual" >>$(METADATA)
+	@echo "Requires:        beakerlib" >>$(METADATA)
 	@echo "Requires:        mock" >>$(METADATA)
 	@echo "Requires:        yum-utils" >>$(METADATA)
 	@echo "RhtsOptions:     -Compatible -CompatService" >>$(METADATA)

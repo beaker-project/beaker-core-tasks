@@ -68,6 +68,7 @@ $(METADATA): Makefile
 	@echo "TestVersion:  $(TESTVERSION)"	>> $(METADATA)
 	@echo "Description:  This refreshes the database with the hardware inventory of the machine its run on">> $(METADATA)
 	@echo "TestTime:     15m" >> $(METADATA)
+	@echo "Requires:     beakerlib" >> $(METADATA)
 	@echo "Requires:     kvm" >> $(METADATA)
 	@echo "Requires:     make" >> $(METADATA)
 	@echo "Requires:     beaker-system-scan" >> $(METADATA)
