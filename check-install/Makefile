@@ -7,7 +7,7 @@ export TESTVERSION=1.0
 include /usr/share/rhts/lib/rhts-make.include
 
 BUILT_FILES=
-FILES=sysinfo.sh
+FILES=$(METADATA) sysinfo.sh
 
 .PHONY: run
 run:
