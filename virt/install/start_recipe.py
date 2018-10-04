@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 
 """
 Marks a guest recipe as started. Pass the recipe ID as the first argument.
