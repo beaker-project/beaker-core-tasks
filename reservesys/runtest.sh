@@ -211,7 +211,18 @@ chmod 777 $SCRIPT2
 
 NOTIFY()
 {
-    /sbin/service sendmail start
+    if command -v systemctl >/dev/null ; then
+        # Any of the following services could have been installed to satisfy
+        # the "MTA" virtual provides. They all provide an implementation of
+        # /usr/sbin/sendmail. So let's just try to start all of them
+        # and we assume one will succeed.
+        systemctl start postfix.service
+        systemctl start exim.service
+        systemctl start sendmail.service
+        systemctl start opensmtpd.service
+    else
+        /sbin/service sendmail start
+    fi
     local msg=$(mktemp)
 
 cat > $msg <<-EOF
