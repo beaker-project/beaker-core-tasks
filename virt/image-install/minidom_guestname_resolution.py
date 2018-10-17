@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 # this script is used to update the /etc/hosts file in the host/dom0 so that the
 # guestname will be resolved to the guest's IP address. 
