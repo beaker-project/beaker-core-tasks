@@ -93,6 +93,7 @@ $(METADATA):
 	@echo "Architectures:	i386 x86_64 ia64" >> $(METADATA)
 	@echo "Priority:	Manual" >> $(METADATA)
 	@echo "Requires:	beakerlib" >> $(METADATA)
+	@echo "Requires:	python2" >> $(METADATA)
 	@echo "Requires:	autofs" >> $(METADATA)
 	@echo "Requires:	bridge-utils" >> $(METADATA)
 	@echo "Requires:	expect" >> $(METADATA)
