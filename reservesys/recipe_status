@@ -1,10 +1,12 @@
-#!/usr/bin/python
-
-import xmlrpclib
 import sys
 import getopt
 import os
 from xml.dom.minidom import parseString
+
+if sys.version_info >= (3, 0):
+    import xmlrpc.client as xmlrpclib
+else:
+    import xmlrpclib
 
 def main():
     lab_controller = None
@@ -19,8 +21,9 @@ def main():
 
     try:
         opts, args = getopt.getopt(args, 'l:r:', ['lab_controller='])
-    except:
-        usage()
+    except getopt.GetoptError as e:
+        print(e.msg)
+        sys.exit(1)
     for opt, val in opts:
         if opt in ('-l', '--lab_controller'):
             lab_controller = val
@@ -28,11 +31,11 @@ def main():
             recipeid = val
 
     if not recipeid:
-        print "You must specify the recipe id with the -r flag"
+        print("You must specify the recipe id with the -r flag")
         sys.exit(1)
 
     if not lab_controller:
-        print "You must specify the lab controller with the -l flag"
+        print("You must specify the lab controller with the -l flag")
         sys.exit(1)
 
     proxy = xmlrpclib.ServerProxy("http://%s:8000" % lab_controller)
@@ -43,6 +46,7 @@ def main():
         if recipe.getAttribute("id") == recipeid and \
            recipe.getAttribute("result") != "Pass":
             sys.exit(1)
+
 
 if __name__ == '__main__':
     main()

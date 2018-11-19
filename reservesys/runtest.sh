@@ -295,7 +295,16 @@ if [ -n "$REBOOTCOUNT" ]; then
             # we check it. Otherwise we might miss a Fail from the task right before 
             # this one (its result will remain New until beakerd computes it).
             sleep 40
-            ./recipe_status
+
+            if command -v python3 >/dev/null; then
+                python_command="python3"
+            elif [ -f /usr/libexec/platform-python ] && /usr/libexec/platform-python --version 2>&1 | grep -q "Python 3" ; then
+                python_command="/usr/libexec/platform-python"
+            else
+                python_command="python"
+            fi
+
+            $python_command recipe_status
             if [ $? -eq 0 ]; then
                 RprtRslt $TEST/RESERVE_SKIP PASS 0
                 exit 0
