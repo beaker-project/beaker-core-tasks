@@ -110,6 +110,7 @@ $(METADATA):
 	@echo "Requires:	virt-install" >> $(METADATA)
 	@echo "Requires:	vnc" >> $(METADATA)
 	@echo "Requires:	vnc-server" >> $(METADATA)
+	@echo "Requires:	wget" >> $(METADATA)
 	@echo "Requires:	xen" >> $(METADATA)
 	@echo "Requires:	xorg-x11-server-Xvfb" >> $(METADATA)
 	@echo "Requires:	xmlrpc-c-devel" >> $(METADATA)
