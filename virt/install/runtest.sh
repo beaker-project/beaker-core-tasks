@@ -761,44 +761,43 @@ if [[ ${kvm_num} -gt 0 ]]; then
    if [[ ${ver%%.*} -ge 6 ]]; then
       # for rhel6 & above we need to set up bridging and get network manager out
       # of the way...
-      if [[ ${REBOOTCOUNT} -eq 0 ]]; then
 
-         ## we need to configure/add bridge to establish bridged networking for 
-         ## kvm guests
-         def_line=$(ip route list | grep ^default)
-         defnum=$(perl -e 'for ($i=0; $i<$#ARGV; $i++ ) { if ($ARGV[$i] eq "dev" ) { $_ = $ARGV[ $i + 1 ]; if ( /^(\w*)(\d+)/ ) { print "$_ $2"; } } }' ${def_line} )
-         actnum=$(echo ${defnum} | awk '{print $2}')
-         netdev=$(echo ${defnum} | awk '{print $1}')
-         vifnum=${vifnum:-$actnum}
-         if [ -z ${vifnum} ]; then 
-            echo "Can't get the interface number "
-            report_result ${TEST}_networksetup FAIL 1
-            exit 1
-         fi 
-         brdev="br${vifnum}"
-         pdev="p${netdev}"
-         mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
-         if [ -z ${mac} ]; then 
-            echo "Can't find the mac address"
-            report_result ${TEST}_networksetupnomac FAIL 1
-            exit 1
-         fi
-         echo "brdev: ${brdev} netdev: ${netdev} pdev: ${pdev} mac: ${mac} "  
-    
-         rename_current_ifcfg_config
-         if [[ $? -ne 0 ]]; then
-            echo "Problem copying network config scripts"
-            report_result ${TEST}_networksetup FAIL 1
-            exit 1
-         fi
-         cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$netdev
+      ## we need to configure/add bridge to establish bridged networking for
+      ## kvm guests
+      def_line=$(ip route list | grep ^default)
+      defnum=$(perl -e 'for ($i=0; $i<$#ARGV; $i++ ) { if ($ARGV[$i] eq "dev" ) { $_ = $ARGV[ $i + 1 ]; if ( /^(\w*)(\d+)/ ) { print "$_ $2"; } } }' ${def_line} )
+      actnum=$(echo ${defnum} | awk '{print $2}')
+      netdev=$(echo ${defnum} | awk '{print $1}')
+      vifnum=${vifnum:-$actnum}
+      if [ -z ${vifnum} ]; then
+         echo "Can't get the interface number "
+         report_result ${TEST}_networksetup FAIL 1
+         exit 1
+      fi
+      brdev="br${vifnum}"
+      pdev="p${netdev}"
+      mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
+      if [ -z ${mac} ]; then
+         echo "Can't find the mac address"
+         report_result ${TEST}_networksetupnomac FAIL 1
+         exit 1
+      fi
+      echo "brdev: ${brdev} netdev: ${netdev} pdev: ${pdev} mac: ${mac} "
+
+      rename_current_ifcfg_config
+      if [[ $? -ne 0 ]]; then
+         echo "Problem copying network config scripts"
+         report_result ${TEST}_networksetup FAIL 1
+         exit 1
+      fi
+      cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$netdev
 DEVICE=$netdev
 ONBOOT=yes
 BRIDGE=$brdev
 HWADDR=$mac
 EOF
-      
-         cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$brdev
+
+      cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$brdev
 DEVICE=$brdev
 BOOTPROTO=dhcp
 ONBOOT=yes
@@ -806,44 +805,53 @@ TYPE=Bridge
 DELAY=0
 EOF
 
-         if rlIsRHEL '<7' ; then
-            service NetworkManager stop
-            chkconfig NetworkManager off
-            chkconfig network on
-            service network restart
-         else
-            # Turn on NetworkManager which supports bridging on RHEL7
-            chkconfig NetworkManager on
-            service NetworkManager restart
-         fi
+      if rlIsRHEL '<7' ; then
+         service NetworkManager stop
+         chkconfig NetworkManager off
+         chkconfig network on
+         service network restart
+      else
+         # Turn on NetworkManager which supports bridging on RHEL7
+         systemctl start NetworkManager
+         systemctl enable NetworkManager
 
-         if [[ $? -ne 0 ]]; then
-            echo "problem restarting network" | tee -a $OUTPUTFILE
-            report_result ${TEST}_networksetup FAIL 1
+         /sbin/ifup $brdev
+         /sbin/ifup $netdev
+         # check connectivity after the change
+         connected=0
+         tries=30
+         while [ $connected -eq 0 -a $tries -gt 0 ]; do
+            ping -c 1 -4 $LAB_CONTROLLER && connected=1 && break
+            sleep 1
+            tries=$(( tries - 1 ))
+         done
+         if [ $connected -eq 0 ]; then
+            echo "Problem while restoring network on $brdev"
             exit 1
-         else
-            echo "configured a bridge: $netdev "
          fi
-
-         echo "Rebooting after configuring the bridge" >> $OUTPUTFILE
-         report_result rhts-reboot PASS $REBOOTCOUNT
-         rhts-reboot
-
-      # when it's already set up and rebooted, then get the bridge to use to 
-      # pass it on to virt-install 
-      else 
-         def_line=$(ip route list | grep ^default)
-         defnum=$(perl -e 'for ($i=0; $i<$#ARGV; $i++ ) { if ($ARGV[$i] eq "dev" ) { $_ = $ARGV[ $i + 1 ]; if ( /^(\w*)(\d+)/ ) { print "$_ $2"; } } }' ${def_line} )
-         actnum=$(echo ${defnum} | awk '{print $2}')
-         netdev=$(echo ${defnum} | awk '{print $1}')
-         vifnum=${vifnum:-$actnum}
-         if [ -z ${vifnum} ]; then 
-            echo "Can't get the interface number "
-            report_result ${TEST}_networksetup FAIL 1
-            exit 1
-         fi 
-         brdev="br${vifnum}"
       fi
+
+      if [[ $? -ne 0 ]]; then
+         echo "problem restarting network" | tee -a $OUTPUTFILE
+         report_result ${TEST}_networksetup FAIL 1
+         exit 1
+      else
+         echo "configured a bridge: $netdev "
+      fi
+
+      # when it's already set up, then get the bridge to use to
+      # pass it on to virt-install
+      def_line=$(ip route list | grep ^default)
+      defnum=$(perl -e 'for ($i=0; $i<$#ARGV; $i++ ) { if ($ARGV[$i] eq "dev" ) { $_ = $ARGV[ $i + 1 ]; if ( /^(\w*)(\d+)/ ) { print "$_ $2"; } } }' ${def_line} )
+      actnum=$(echo ${defnum} | awk '{print $2}')
+      netdev=$(echo ${defnum} | awk '{print $1}')
+      vifnum=${vifnum:-$actnum}
+      if [ -z ${vifnum} ]; then
+         echo "Can't get the interface number "
+         report_result ${TEST}_networksetup FAIL 1
+         exit 1
+      fi
+      brdev="br${vifnum}"
 
     else
          # we need to configure/add bridge to establish bridged networking for 
