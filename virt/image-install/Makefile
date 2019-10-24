@@ -119,5 +119,7 @@ $(METADATA):
 	@echo "Requires:	@virtualization-client" >> $(METADATA)
 	@echo "Requires:	@x11" >> $(METADATA)
 	@echo "Requires:	@fonts" >> $(METADATA)
+	@echo "Requires:	initscripts" >> $(METADATA)
+	@echo "Requires:	chkconfig" >> $(METADATA)
 	@echo "RhtsOptions:     -Compatible -CompatService" >> $(METADATA)
 	@echo "License:		GPLv2"		>> $(METADATA)
