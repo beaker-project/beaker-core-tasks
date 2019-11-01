@@ -120,7 +120,7 @@ EOF
     fi
 
     yaboot_file=/boot/etc/yaboot.conf
- 
+
     if [ -f $yaboot_file ] ; then
 	DeBug "Using: $yaboot_file"
 	grep vmlinuz $yaboot_file
@@ -173,7 +173,7 @@ EOF
 	DeBug "$zipl_file"
 	cat $zipl_file | tee -a $DEBUGLOG
     fi
-    
+
     sync
     sleep 5
     DeBug "Exit SelectKernel"
@@ -253,27 +253,27 @@ function setuprhel5consoles()
     if ! cp zrhel5_write_consolelogs.initd /etc/init.d/zrhel5_write_consolelogs; then
        echo "Problem copying zrhel5_write_consolelogs.initd to initd dir"
        RESULT="FAIL"
-       let "FAIL=${FAIL}+1"        
+       let "FAIL=${FAIL}+1"
     fi
 
-    if ! cp zrhel5_write_consolelogs.py /usr/local/bin/zrhel5_write_consolelogs; then 
+    if ! cp zrhel5_write_consolelogs.py /usr/local/bin/zrhel5_write_consolelogs; then
        echo "Problem copying zrhel5_write_consolelogs.py to /usr/local/bin"
        RESULT="FAIL"
-       let "FAIL=${FAIL}+1"        
+       let "FAIL=${FAIL}+1"
     fi
-    if ! chmod 755 /usr/local/bin/zrhel5_write_consolelogs; then 
+    if ! chmod 755 /usr/local/bin/zrhel5_write_consolelogs; then
        echo "Problem with chmoding zrhel5_write_consolelogs"
        RESULT="FAIL"
-       let "FAIL=${FAIL}+1"        
+       let "FAIL=${FAIL}+1"
     fi
 
-    if ! chkconfig --add zrhel5_write_consolelogs; then 
+    if ! chkconfig --add zrhel5_write_consolelogs; then
        echo "problem with chkconfig --add zrhel5_write_consolelogs"
        RESULT="FAIL"
        let "FAIL=${FAIL}+1"
     fi
 
-    if ! chkconfig zrhel5_write_consolelogs on; then 
+    if ! chkconfig zrhel5_write_consolelogs on; then
        echo "problem with chkconfig zrhel5_write_consolelogs on"
        RESULT="FAIL"
        let "FAIL=${FAIL}+1"
@@ -285,33 +285,33 @@ function setuprhel5consoles()
     if ! service iptables save; then
        echo "Problem with service iptables save"
        RESULT="FAIL"
-       let "FAIL=${FAIL}+1"        
+       let "FAIL=${FAIL}+1"
     fi
-      
+
     if ! cp -f iptables_after_libvirtd.initd /etc/init.d/iptables_after_libvirtd; then
        echo "Problem with copying iptables_after_libvirtd.initd"
        RESULT="FAIL"
-       let "FAIL=${FAIL}+1"        
+       let "FAIL=${FAIL}+1"
     fi
 
-    if ! chkconfig --add iptables_after_libvirtd; then 
+    if ! chkconfig --add iptables_after_libvirtd; then
        echo "problem with adding iptables_after_libvirtd"
        RESULT="FAIL"
-       let "FAIL=${FAIL}+1"        
+       let "FAIL=${FAIL}+1"
     fi
 
-    if ! chkconfig iptables_after_libvirtd on; then 
+    if ! chkconfig iptables_after_libvirtd on; then
        echo "problem with chkconfig iptables_after_libvirtd on"
        RESULT="FAIL"
        let "FAIL=${FAIL}+1"
     fi
 
-    if ! service iptables_after_libvirtd start; then 
+    if ! service iptables_after_libvirtd start; then
        echo "problem with service iptables_after_libvirtd start"
        RESULT="FAIL"
        let "FAIL=${FAIL}+1"
     fi
-      
+
     echo "Status of iptables: " | tee -a $OUTPUTFILE
     service iptables status >> $OUTPUTFILE 2>&1
     service zrhel5_write_consolelogs start
@@ -341,20 +341,20 @@ function setupconsolelogs()
 		let "FAIL=${FAIL}+1"
 	fi
 
-	if ! cp logguestconsoles /usr/local/bin; then 
+	if ! cp logguestconsoles /usr/local/bin; then
 		echo "Problem with copying logguestconsoles to /usr/local/bin"
 		echo "Guest console logs won't be available"
 		RESULT="FAIL"
 		let "FAIL=${FAIL}+1"
 	fi
 
-	if ! cp logguestconsoles.initd /etc/init.d/logguestconsoles; then 
+	if ! cp logguestconsoles.initd /etc/init.d/logguestconsoles; then
 		echo "problem with copying init script"
 		RESULT="FAIL"
 		let "FAIL=${FAIL}+1"
 	fi
 
-	if ! chkconfig --add logguestconsoles; then 
+	if ! chkconfig --add logguestconsoles; then
 		echo "problem with chkconfig --add logguestconsoles"
 		RESULT="FAIL"
 		let "FAIL=${FAIL}+1"
@@ -382,7 +382,7 @@ function setupconsolelogs()
 	fi
 }
 
-function setuprhel5_xmlrpcc() 
+function setuprhel5_xmlrpcc()
 {
         local SRCRPM="xmlrpc-c.el5.src.rpm"
         local FAIL=0
@@ -571,7 +571,7 @@ function ConfirmXenNetDevices ()
     # RHEL5 brings up all the network devices and sets
     # the last network device to come up as the default.
     # ConfirmXenNetDevices:
-    # Confirms the network installation device 
+    # Confirms the network installation device
     # is set as the default network device.
     # This is required for proper network bridging on XEN guests.
 
@@ -650,7 +650,7 @@ fi
 
 chmod 755 *.initd
 # if this a test/devel version, create the dirs/scripts other tests might rely on
-if [[ x"$(pwd)" != "x/mnt/tests/distribution/virt/install" ]]; then 
+if [[ x"$(pwd)" != "x/mnt/tests/distribution/virt/install" ]]; then
 	mkdir -p /mnt/tests/distribution/virt/install
 	cp get_guest_*.py /mnt/tests/distribution/virt/install
 	chmod 755 /mnt/tests/distribution/virt/install/*
@@ -662,7 +662,7 @@ TurnOnLibvirtdLogging
 
 ## normally this test will run in selinux enforcing mode but sometimes we may
 # want to run it in permissive mode to de bug selinux issues:
-if [[ -n "${PERMISSIVE_MODE}" ]]; then 
+if [[ -n "${PERMISSIVE_MODE}" ]]; then
 	setenforce Permissive
 	if [[ $? -ne 0 ]] ; then
 		echo "Problem with setting enforcing to permissive"
@@ -679,27 +679,27 @@ if [ -z $HOME ] ; then
     export HOME=/root
 fi
 
-# for rhel5 , there is an issue with ntap-vader.corp autofs settings. So we'll do the workaround here.. 
+# for rhel5 , there is an issue with ntap-vader.corp autofs settings. So we'll do the workaround here..
 # for more info , see RT#58580
 # 02092011 UPDATE: same issue resurfaced for rhel6 on RDU boxen, so we'll do workaround for all
 #   See: RT#101432
 perl -pi.bak -e 's#/net\t-hosts#/net\tauto.net#g' /etc/auto.master
-if ! service autofs restart; then 
-	echo "problem restarting autofs after editing /etc/auto.master" 
+if ! service autofs restart; then
+	echo "problem restarting autofs after editing /etc/auto.master"
 	report_result ${TEST}_autofssetup FAIL 1
 fi
 
-# starting with rhel 5.4 we'll have both xen and kvm hypervisors shipped with the tree. 
+# starting with rhel 5.4 we'll have both xen and kvm hypervisors shipped with the tree.
 # This test will be used to install guests under both hypervisors hence it needs to
 # identify what it is doing. @virtualization group pulls in packages/kernels for both
 # hypervisors and by default kernel-xen is selected which means any guests installed will
-# be xen guests. To allow testers to install kvm guestsi, --kvm argument in guest_args 
+# be xen guests. To allow testers to install kvm guestsi, --kvm argument in guest_args
 # will be used. It will NOT be allowed to specify both xen or kvm guests. All guests must
 # be of one hypervisor. The flow will be:
 #
-#    Check if this is rhel6 installation or not. If it is, then just assume all kvm guests 
+#    Check if this is rhel6 installation or not. If it is, then just assume all kvm guests
 #      with or without --kvm indicators.
-#   
+#
 #    If this is rhel5 then, figure what type of guests there are
 #     - Make sure that ALL guests are of the same type
 #     - if kvm:
@@ -725,9 +725,9 @@ if ver=$(rpm -q --qf '%{version}\n' --whatprovides redhat-release | sed 's/[A-Za
 	fi
 fi
 
-# For some reason some f17 jobs didn't install expect 
+# For some reason some f17 jobs didn't install expect
 # workaround for it:
-if ! rpm -q expect; then 
+if ! rpm -q expect; then
 	yum -y install expect
 	if ! rpm -q expect; then
 		echo "Can't find/install expect package"
@@ -742,15 +742,15 @@ if [[ ${kvm_num} -gt 0 ]]; then
       xenkern=$(uname -r)
       basekern=${xenkern%"xen"}
       # if for whatever reason base kernel isn't installed, install it..
-      if ! rpm -q kernel-${basekern}; then 
-         yum -y install kernel-${basekern} kvm 
+      if ! rpm -q kernel-${basekern}; then
+         yum -y install kernel-${basekern} kvm
       fi
       # make sure that yum installed it..
-      if ! rpm -q kvm; then 
+      if ! rpm -q kvm; then
          echo "Can't find/install kvm" >> $OUTPUTFILE
          report_result ${TEST}_nokvm FAIL 1
          exit 1
-      fi 
+      fi
       echo "this test seems to be for kvm guests, booting into vanilla kernel"
       SelectKernel ${basekern}
       echo "Rebooting into base kernel since this is kvm guest" >> $OUTPUTFILE
@@ -854,7 +854,7 @@ EOF
       brdev="br${vifnum}"
 
     else
-         # we need to configure/add bridge to establish bridged networking for 
+         # we need to configure/add bridge to establish bridged networking for
          # kvm guests
 
          def_line=$(ip route list | grep ^default)
@@ -862,20 +862,20 @@ EOF
          actnum=$(echo ${defnum} | awk '{print $2}')
          netdev=$(echo ${defnum} | awk '{print $1}')
          vifnum=${vifnum:-$actnum}
-         if [ -z ${vifnum} ]; then 
+         if [ -z ${vifnum} ]; then
             echo "Can't get the interface number "
             report_result ${TEST}_networksetup FAIL 1
             exit 1
-         fi 
+         fi
          brdev="br${vifnum}"
          pdev="p${netdev}"
          mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
-         if [ -z ${mac} ]; then 
+         if [ -z ${mac} ]; then
             echo "Can't find the mac address"
             report_result ${TEST}_networksetupnomac FAIL 1
             exit 1
          fi
-         echo "brdev: ${brdev} netdev: ${netdev} pdev: ${pdev} mac: ${mac} "  
+         echo "brdev: ${brdev} netdev: ${netdev} pdev: ${pdev} mac: ${mac} "
 
          rename_current_ifcfg_config
          if [[ $? -ne 0 ]]; then
@@ -889,7 +889,7 @@ ONBOOT=yes
 BRIDGE=$brdev
 HWADDR=$mac
 EOF
-      
+
          cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$brdev
 DEVICE=$brdev
 BOOTPROTO=dhcp
@@ -897,13 +897,13 @@ ONBOOT=yes
 TYPE=Bridge
 DELAY=0
 EOF
-      
+
 
          service NetworkManager stop
          chkconfig NetworkManager off
          chkconfig network on
          service network restart
-         if [[ $? -ne 0 ]]; then 
+         if [[ $? -ne 0 ]]; then
             echo "problem restarting network"
             report_result ${TEST}_networksetup FAIL 1
             exit 1
@@ -921,10 +921,10 @@ EOF
    fi
 
 else # this is a xen install
-   
+
    # turn on various logs in xend and restart xend
    if [[ $REBOOTCOUNT -eq 0 ]]; then
-      perl -pi.bak -e 's/#*\(enable-dump\s+no\)/(enable-dump yes)/g' /etc/xen/xend-config.sxp 
+      perl -pi.bak -e 's/#*\(enable-dump\s+no\)/(enable-dump yes)/g' /etc/xen/xend-config.sxp
       perl -pi.bak -e 's/^#*XENCONSOLED_LOG_HYPERVISOR=no/XENCONSOLED_LOG_HYPERVISOR=yes/g;s/^#*XENCONSOLED_LOG_GUESTS=no/XENCONSOLED_LOG_GUESTS=yes/g;s/^#*XENCONSOLED_LOG_DIR=.*$/XENCONSOLED_LOG_DIR=\/var\/log\/xen\/console/g' /etc/sysconfig/xend
 
       echo "" >> $OUTPUTFILE
@@ -952,7 +952,7 @@ else # this is a xen install
       bridge=$(ip route list | awk '/^default / { print $NF }' | sed 's/^[^0-9]*//')
       XENBR_ADD="--bridge=xenbr${bridge}"
    fi
-  
+
    # are we running on a Xen kernel in domain 0 ?
    # (only report if RHTS tried running us on an unsuitable host)
    #
@@ -965,20 +965,20 @@ else # this is a xen install
 fi
 
 ## we need libvirt-devel, that might not be installed during installation time
-if ! rpm -q libvirt-devel; then 
+if ! rpm -q libvirt-devel; then
     yum -y install libvirt-devel
-    if ! rpm -q libvirt-devel; then 
-        echo "can't install libvirt-devel" 
+    if ! rpm -q libvirt-devel; then
+        echo "can't install libvirt-devel"
         echo "guest console logs might not work"
         report_result NO_libvirt-devel WARN 10
     fi
 fi
 
 echo "" >> $OUTPUTFILE
-echo "***********************" >> $OUTPUTFILE 
-echo "* SELinux Status      *" >> $OUTPUTFILE 
-echo "***********************" >> $OUTPUTFILE 
-/usr/sbin/sestatus | tee -a $OUTPUTFILE 
+echo "***********************" >> $OUTPUTFILE
+echo "* SELinux Status      *" >> $OUTPUTFILE
+echo "***********************" >> $OUTPUTFILE
+/usr/sbin/sestatus | tee -a $OUTPUTFILE
 virtinst="./virtinstall.exp"
 
 # we need to make vnc installs happy:
@@ -987,18 +987,18 @@ if pidof Xvfb; then
 fi
 [ -e /tmp/.X1-lock ] && rm -rf /tmp/.X1-lock
 # Xvfb in optional repo so it might not be installed.
-if ! which Xvfb; then  
+if ! which Xvfb; then
 	yum --enablerepo=beaker-optional* -y install xorg-x11-server-Xvfb
 fi
 Xvfb :1 -screen 0 1600x1200x24 -fbdir /tmp &
-if [[ $? -ne 0 ]]; then 
+if [[ $? -ne 0 ]]; then
 	echo "Xvfb has failed. If there are any graphical installation, they will fail"
 	report_result ${TEST}_NoXvfb_NoGraphicalInst WARN 0
 fi
 
 export DISPLAY=:1
 
-if [[ $REBOOTCOUNT -gt 1 ]]; then 
+if [[ $REBOOTCOUNT -gt 1 ]]; then
    echo "Looks like dom0 rebooted during a guest install. Check console logs" >> $OUTPUTFILE
    report_result ${TEST}_dom0rebooted FAIL 99
    submitvirtlogs
@@ -1008,11 +1008,15 @@ fi
 i=0
 fail=0
 
-./get_guest_info.py > ./tmp.guests
+if rlIsRHEL '>=8' ; then
+   LOCATION="--location http"
+fi
+
+./get_guest_info.py $LOCATION > ./tmp.guests
 echo "Guests info:" | tee -a $OUTPUTFILE
 cat ./tmp.guests | tee -a $OUTPUTFILE
 
-# go thru the guests and set up console sniff/upload 
+# go thru the guests and set up console sniff/upload
 while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
 	guest_args guest_kernel_options; do
    if ! mkdir -p $(pwd)/guests/${guest_name}/logs; then
@@ -1020,8 +1024,8 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
    fi
    guest_con_logfile="$(pwd)/guests/${guest_name}/logs/${guest_name}_console.log"
    echo "$guest_con_logfile $guest_recipeid" >> /usr/local/etc/logguestconsoles.conf
-   if [ ! -e $guest_con_logfile ]  ; then 
-      touch $guest_con_logfile 
+   if [ ! -e $guest_con_logfile ]  ; then
+      touch $guest_con_logfile
    fi
    chmod a+rw $guest_con_logfile
 done < ./tmp.guests
@@ -1065,13 +1069,13 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
       report_result ${TEST}_cant_create_dirs FAIL 10
       exit 1
    fi
-   if ! chmod -R 777 $(pwd)/guests/${guest_name}; then 
+   if ! chmod -R 777 $(pwd)/guests/${guest_name}; then
       echo "problem with chmod -R 777 $(pwd)/guests/${guest_name}"
       report_result ${TEST}_chmod_issue FAIL  10
       exit 1
    fi
 
-   if ! wget -q ${guest_ks} -O ./${guest_name}.ks ; then 
+   if ! wget -q ${guest_ks} -O ./${guest_name}.ks ; then
       echo "Can't reach ${guest_ks} , exiting"
       report_result ${TEST}_KSunreachable FAIL 100
       exit 1
@@ -1087,7 +1091,7 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
    var_lib_free=$(echo ${var_lib_df} | awk '{print $11}')
    home_df=$(df /home)
    home_free=$(echo ${home_df} | awk '{print $11}')
-   if [[ ${home_free} -gt ${var_lib_free} ]]; then 
+   if [[ ${home_free} -gt ${var_lib_free} ]]; then
       mkdir -p /home/virtimages/VirtualMachines
       home_basedir=1
    fi
@@ -1113,7 +1117,7 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
       elif uname -m | grep -q aarch64; then
          CMDLINE="${CMDLINE} --nographics --noautoconsole --wait -1"
       fi
-   else   
+   else
       ## the first 2 conditions are for fedora releases since they too can support xen guests.
       if grep -q -i fedora /etc/fedora-release; then
          EXTRA_ARGS="ks=$guest_ks serial"
@@ -1149,9 +1153,9 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
      # make an exception for given --network arg..
      # see BZ#821984
      GIVENNW=$(echo $CMDLINE | awk '{ for (i=1;i<=NF;i++) { if ( $i == "--network" ) { i+=1; printf "%s ", $i } else { continue; } } }')
-     if [[ -z "${GIVENNW}" ]]; then 
+     if [[ -z "${GIVENNW}" ]]; then
         CMDLINE="${CMDLINE} --ver6 --network bridge:${brdev}${netdev_model} "
-     else 
+     else
         CMDLINE=$(echo $CMDLINE | awk '{ for (i=1;i<=NF;i++) { if ( $i == "--network" ) { i+=1; continue; } else printf "%s ", $i } }')
         NWARG=""
         for opts in ${GIVENNW}
@@ -1168,7 +1172,7 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
 
         EXTRA_ARGS="ksdevice=eth0 $EXTRA_ARGS"
         CMDLINE="${CMDLINE} --ver6 ${NWARG}"
-        
+
      fi
 
      # beginning with rhel6 virt-install can take -serial option. automatically
@@ -1180,7 +1184,7 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
             CMDLINE="$CMDLINE --serial file,path=$(pwd)/guests/${guest_name}/logs/${guest_name}_console.log --serial pty --console pty "
             # workaround for BZ: 731115
             l_guest_name=$(echo ${guest_name} | tr [:upper:] [:lower:])
-            if [[ x"$guest_name" != x"$l_guest_name" ]]; then 
+            if [[ x"$guest_name" != x"$l_guest_name" ]]; then
                ln -sf $(pwd)/guests/${guest_name} $(pwd)/guests/${l_guest_name}
                if [[ $? -ne 0 ]]; then
                   echo "error with workaround for bz731115"
@@ -1189,7 +1193,7 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
             fi
             # end of workaround for BZ 731115
             #
-        fi 
+        fi
      fi
    fi
 
@@ -1204,17 +1208,17 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
       if [[ ${kvm_num} -gt 0 ]]; then
         if [[ ${home_basedir} -eq 0 ]]; then
             CMDLINE="${CMDLINE} --file /var/lib/libvirt/images/${guest_name}.img "
-        else 
+        else
             CMDLINE="${CMDLINE} --file /home/virtimages/VirtualMachines/${guest_name}.img "
         fi
       else
         if [[ ${home_basedir} -eq 0 ]]; then
             CMDLINE="${CMDLINE} --file /var/lib/xen/images/${guest_name}.img "
-        else 
+        else
             CMDLINE="${CMDLINE} --file /home/virtimages/VirtualMachines/${guest_name}.img "
         fi
       fi
-   fi  
+   fi
    # end the workaround for BZ 729608
 
    echo "Fallocating VM files: `date`" | tee -a $OUTPUTFILE
@@ -1229,7 +1233,7 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
    DeBug "***** Start $virtinst ${CMDLINE} *****"
    echo  "***** Start $virtinst ${CMDLINE} *****" >> $OUTPUTFILE
    starttime=$(date +%s)
-   echo "Start time: $starttime" >> $OUTPUTFILE 
+   echo "Start time: $starttime" >> $OUTPUTFILE
    if selinuxenabled; then
       eval /usr/bin/runcon -t unconfined_t -- $virtinst $CMDLINE 2>&1
    else
@@ -1237,7 +1241,7 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
    fi
    value=$?
    endtime=$(date +%s)
-   echo "End time: $endtime" >> $OUTPUTFILE 
+   echo "End time: $endtime" >> $OUTPUTFILE
    if [[ $value -eq 1 ]]; then
       echo "WARNING: install may or may not have failed. Check the guest" >> $OUTPUTFILE
       let "fail=${fail}+1"
@@ -1249,17 +1253,17 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
       result=WARN
       report_result ${TEST}/install_${guest_name} $result $value
    elif [[ $value -eq 33 ]]; then
-      echo "libvirt error" >> $OUTPUTFILE 
+      echo "libvirt error" >> $OUTPUTFILE
       let "fail=${fail}+1"
       result=FAIL
       report_result ${TEST}/install_${guest_name}_libvirterror $result $value
    elif [[ $value -eq 37 ]]; then
-      echo "guest crashed" >> $OUTPUTFILE 
+      echo "guest crashed" >> $OUTPUTFILE
       let "fail=${fail}+1"
       result=FAIL
       report_result ${TEST}/install_${guest_name}_guestcrash $result $value
    elif [[ $value -eq 38 ]]; then
-      echo "no HVM support on the machine" >> $OUTPUTFILE 
+      echo "no HVM support on the machine" >> $OUTPUTFILE
       let "fail=${fail}+1"
       result=FAIL
       report_result ${TEST}/install_${guest_name}_noHVMsupport $result $value
@@ -1277,23 +1281,23 @@ while IFS=$'\t' read guest_recipeid guest_name guest_mac guest_loc guest_ks \
    # ${guest_name}_install.log should be created by the virtinstall.exp script
    rhts_submit_log -l `pwd`/guests/${guest_name}/logs/${guest_name}_install.log
    # and for rhel6 and above we should have a console log.
-   if [ -e `pwd`/guests/${guest_name}/logs/${guest_name}_console.log ]; then 
+   if [ -e `pwd`/guests/${guest_name}/logs/${guest_name}_console.log ]; then
 	rhts_submit_log -l `pwd`/guests/${guest_name}/logs/${guest_name}_console.log
    fi
    # upload the guest's config file too.
    if [[ ${kvm_num} -lt 1 ]]; then
       rhts_submit_log -l /etc/xen/${guest_name}
-   elif virsh dumpxml ${guest_name}; then 
+   elif virsh dumpxml ${guest_name}; then
       virsh dumpxml ${guest_name} > ./guests/${guest_name}/logs/${guest_name}.xml
       rhts_submit_log -l ./guests/${guest_name}/logs/${guest_name}.xml
    fi
    let i="$i+1"
 done < ./tmp.guests
 if [[ $i -eq 0 ]]; then
-   report_result ${TEST}/noguestinstall PASS 0 
+   report_result ${TEST}/noguestinstall PASS 0
 elif [[ ${fail} -eq 0 ]]; then
    report_result ${TEST} PASS 0
-else 
+else
    report_result ${TEST} FAIL 1
 fi
 
@@ -1306,8 +1310,8 @@ fi
 
 # submit the relevant logfiles
 submitvirtlogs
-if [ -e /nohup.out ]; then 
+if [ -e /nohup.out ]; then
     rhts_submit_log -l /nohup.out
-fi  
+fi
 
 exit 0
