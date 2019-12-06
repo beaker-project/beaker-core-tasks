@@ -821,7 +821,11 @@ EOF
          connected=0
          tries=30
          while [ $connected -eq 0 -a $tries -gt 0 ]; do
-            ping -c 1 -4 $LAB_CONTROLLER && connected=1 && break
+            if rlIsRHEL '<=7.2' ; then
+               ping -c 1 "$LAB_CONTROLLER" && connected=1 && break
+            else
+               ping -c 1 -4 "$LAB_CONTROLLER" && connected=1 && break
+            fi
             sleep 1
             tries=$(( tries - 1 ))
          done
