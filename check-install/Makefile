@@ -11,6 +11,7 @@ FILES=$(METADATA) sysinfo.sh
 
 .PHONY: run
 run:
+	chmod +x ./runtest.sh
 	./runtest.sh
 
 $(METADATA):
