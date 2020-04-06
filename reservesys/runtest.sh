@@ -319,17 +319,8 @@ fi
 
 if [ -n "$RSTRNT_JOBID" ]; then
     # RSTRNT_JOBID is defined which means we are running in restraint
-
-    if [ -n "RSTRNT_PORT" ]; then
-        # If RSTRNT_PORT is defined then run another version
-        # of restraint on this port for test development
-        restraintd --port $RSTRNT_PORT &
-        pid=$!
-
-        trap "cleanup $pid" 15
-    fi
-
     # We stay running in restraint..
+    # TODO: This should be replaced with clever logic like fetching current value of EWD and adjusting
     while (true); do
         sleep 5
     done
