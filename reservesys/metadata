@@ -2,6 +2,7 @@
 name=/distribution/reservesys
 
 [restraint]
+entry_point=./runtest.sh
 dependencies=emacs;vim-enhanced;MTA;psmisc
 max_time=24h
 no_localwatchdog=true
