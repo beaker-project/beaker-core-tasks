@@ -421,24 +421,36 @@ function setuprhel5_xmlrpcc()
 
 function rename_current_ifcfg_config()
 {
-    local cfg_file=/etc/sysconfig/network-scripts/ifcfg-$netdev
-    local ret=0
-    if [ -e "$cfg_file" ]; then
-        echo "Found $cfg_file, trying to rename" | tee -a $OUTPUTFILE
-        mv -vf $cfg_file /etc/sysconfig/network-scripts/Xifcfg-${netdev}.orig >> $OUTPUTFILE
-        ret=$?
+    if rlIsRHEL '>=9' ; then
+        local cfg_file=/etc/NetworkManager/system-connections/${netdev}.nmconnection
+        local ret=0
+        if [ -e "$cfg_file" ]; then
+            echo "Found $cfg_file, trying to rename" | tee -a $OUTPUTFILE
+            mv -vf $cfg_file /etc/NetworkManager/system-connections/X${netdev}.nmconnection.orig >> $OUTPUTFILE
+            ret=$?
+        else
+            ret=1
+        fi
     else
-        # Bug 845225 - interface name does not match ifcfg- config file name
-        echo "Could not find $cfg_file, searching for one based on MAC" | tee -a $OUTPUTFILE
-        local ifcfg_files=`grep -l "${mac}" /etc/sysconfig/network-scripts/ifcfg-*`
-        echo "Matching config files: $ifcfg_files" | tee -a $OUTPUTFILE
-        for cfg_file in $ifcfg_files; do
-            bn=`basename $cfg_file`
-            mv -vf $cfg_file /etc/sysconfig/network-scripts/X$bn.orig >> $OUTPUTFILE
-            if [ $? -ne 0 ]; then
-                ret=1
-            fi
-        done
+        local cfg_file=/etc/sysconfig/network-scripts/ifcfg-$netdev
+        local ret=0
+        if [ -e "$cfg_file" ]; then
+            echo "Found $cfg_file, trying to rename" | tee -a $OUTPUTFILE
+            mv -vf $cfg_file /etc/sysconfig/network-scripts/Xifcfg-${netdev}.orig >> $OUTPUTFILE
+            ret=$?
+        else
+            # Bug 845225 - interface name does not match ifcfg- config file name
+            echo "Could not find $cfg_file, searching for one based on MAC" | tee -a $OUTPUTFILE
+            local ifcfg_files=`grep -l "${mac}" /etc/sysconfig/network-scripts/ifcfg-*`
+            echo "Matching config files: $ifcfg_files" | tee -a $OUTPUTFILE
+            for cfg_file in $ifcfg_files; do
+                bn=`basename $cfg_file`
+                mv -vf $cfg_file /etc/sysconfig/network-scripts/X$bn.orig >> $OUTPUTFILE
+                if [ $? -ne 0 ]; then
+                    ret=1
+                fi
+            done
+        fi
     fi
     return $ret
 }
@@ -790,20 +802,70 @@ if [[ ${kvm_num} -gt 0 ]]; then
          report_result ${TEST}_networksetup FAIL 1
          exit 1
       fi
-      cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$netdev
+      if rlIsRHEL '>=9' ; then
+         cat <<EOF > /etc/NetworkManager/system-connections/$netdev.nmconnection
+[connection]
+id=$netdev
+type=ethernet
+interface-name=$netdev
+permissions=
+master=$brdev
+slave-type=bridge
+
+[ethernet]
+mac-address-blacklist=
+mac-address=$mac
+
+[ipv4]
+dns-search=
+method=auto
+
+[ipv6]
+addr-gen-mode=eui64
+dns-search=
+method=auto
+
+[proxy]
+EOF
+         cat <<EOF > /etc/NetworkManager/system-connections/$brdev.nmconnection
+[connection]
+id=$brdev
+type=bridge
+interface-name=$brdev
+permissions=
+
+[bridge]
+interface-name=$brdev
+
+[ipv4]
+dns-search=
+method=auto
+
+[ipv6]
+addr-gen-mode=eui64
+dns-search=
+method=auto
+
+[proxy]
+EOF
+
+      else
+
+         cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$netdev
 DEVICE=$netdev
 ONBOOT=yes
 BRIDGE=$brdev
 HWADDR=$mac
 EOF
 
-      cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$brdev
+         cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$brdev
 DEVICE=$brdev
 BOOTPROTO=dhcp
 ONBOOT=yes
 TYPE=Bridge
 DELAY=0
 EOF
+      fi
 
       if rlIsRHEL '<7' ; then
          service NetworkManager stop
