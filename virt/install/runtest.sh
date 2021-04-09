@@ -806,7 +806,7 @@ if [[ ${kvm_num} -gt 0 ]]; then
 
          nmcli conn mod $netdev master br1 connection.autoconnect yes 802-3-ethernet.mac-address $mac
          nmcli conn add type bridge con-name $brdev ifname $brdev
-         nmcli conn mod $brdev 802-3-ethernet.mac-address $mac ipv4.method auto ipv6.method auto connection.autoconnect yes bridge.forward_delay 2
+         nmcli conn mod $brdev 802-3-ethernet.clone-mac-address $mac ipv4.method auto ipv6.method auto connection.autoconnect yes bridge.forward_delay 2
 
       else
 
@@ -831,8 +831,7 @@ EOF
          chkconfig NetworkManager off
          chkconfig network on
          service network restart
-      # CB_TBD OFF elif rlIsRHEL '<9' ; then
-      else
+      elif rlIsRHEL '<9' ; then
          # Turn on NetworkManager which supports bridging on RHEL7
          systemctl start NetworkManager
          systemctl enable NetworkManager
@@ -855,12 +854,12 @@ EOF
            CB_TBD OFF echo "Problem while restoring network on $brdev"
             exit 1
          fi
-         # CB_TBD OFF else
+     else
          # NetworkManager enabled by default
-         # CB_TBD OFF nmcli conn down $netdev
-         # CB_TBD OFF nmcli conn reload
-         # CB_TBD OFF nmcli conn up $netdev
-         # CB_TBD OFF nmcli conn up $brdev
+         nmcli conn down $netdev
+         nmcli conn reload
+         nmcli conn up $netdev
+         nmcli conn up $brdev
       fi
 
       if [[ $? -ne 0 ]]; then
