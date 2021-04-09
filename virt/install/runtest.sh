@@ -833,9 +833,8 @@ EOF
          service network restart
 #if 0
       elif rlIsRHEL '<9' ; then
-#else
-      else
 #endif
+      else
          # Turn on NetworkManager which supports bridging on RHEL7
          systemctl start NetworkManager
          systemctl enable NetworkManager
