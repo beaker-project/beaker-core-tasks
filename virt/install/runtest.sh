@@ -426,7 +426,7 @@ function rename_current_ifcfg_config()
         local ret=0
         if [ -e "$cfg_file" ]; then
             echo "Found $cfg_file, trying to rename" | tee -a $OUTPUTFILE
-            mv -vf $cfg_file /etc/NetworkManager/system-connections/X${netdev}.nmconnection.orig >> $OUTPUTFILE
+            cp -vf $cfg_file /etc/NetworkManager/system-connections/X${netdev}.nmconnection.orig >> $OUTPUTFILE
             ret=$?
         else
             ret=1
@@ -803,51 +803,11 @@ if [[ ${kvm_num} -gt 0 ]]; then
          exit 1
       fi
       if rlIsRHEL '>=9' ; then
-         cat <<EOF > /etc/NetworkManager/system-connections/$netdev.nmconnection
-[connection]
-id=$netdev
-type=ethernet
-interface-name=$netdev
-permissions=
-master=$brdev
-slave-type=bridge
 
-[ethernet]
-mac-address-blacklist=
-mac-address=$mac
-
-[ipv4]
-dns-search=
-method=auto
-
-[ipv6]
-addr-gen-mode=eui64
-dns-search=
-method=auto
-
-[proxy]
-EOF
-         cat <<EOF > /etc/NetworkManager/system-connections/$brdev.nmconnection
-[connection]
-id=$brdev
-type=bridge
-interface-name=$brdev
-permissions=
-
-[bridge]
-interface-name=$brdev
-
-[ipv4]
-dns-search=
-method=auto
-
-[ipv6]
-addr-gen-mode=eui64
-dns-search=
-method=auto
-
-[proxy]
-EOF
+         nmcli conn add type bridge con-name $brdev ifname $brdev
+         nmcli conn mod $brdev 802-3-ethernet.mac-address $mac ipv4.method auto ipv6.method auto connection.autoconnect yes
+         nmcli conn mod $netdev master br1 connection.autoconnect yes
+         nmcli conn mod $netdev connection.autoconnect yes
 
       else
 
@@ -872,7 +832,7 @@ EOF
          chkconfig NetworkManager off
          chkconfig network on
          service network restart
-      else
+      elif rlIsRHEL '<9' ; then
          # Turn on NetworkManager which supports bridging on RHEL7
          systemctl start NetworkManager
          systemctl enable NetworkManager
@@ -895,6 +855,12 @@ EOF
             echo "Problem while restoring network on $brdev"
             exit 1
          fi
+      else
+         # NetworkManager enabled by default
+          nmcli conn down $netdev
+          nmcli conn reload
+          nmcli conn up $netdev
+          nmcli conn up $brdev
       fi
 
       if [[ $? -ne 0 ]]; then
