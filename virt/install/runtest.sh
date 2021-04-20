@@ -803,6 +803,7 @@ BOOTPROTO=dhcp
 ONBOOT=yes
 TYPE=Bridge
 DELAY=0
+MACADDR=$mac
 EOF
 
       if rlIsRHEL '<7' ; then
