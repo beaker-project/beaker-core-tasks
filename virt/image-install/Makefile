@@ -24,7 +24,7 @@ define cpfile
 endef
 
 define pyfile
-	mv py2/$(1) . ;
+	[ -f /usr/bin/python3 ] && mv py3/$(1) . || mv py2/$(1) . ;
 endef
 
 BINFILES= guestcheck4down   \
@@ -103,7 +103,8 @@ $(METADATA):
 	@echo "Architectures:	i386 x86_64 ia64" >> $(METADATA)
 	@echo "Priority:	Manual" >> $(METADATA)
 	@echo "Requires:	beakerlib" >> $(METADATA)
-	@echo "Requires:	python2" >> $(METADATA)
+	@echo "Requires:	python" >> $(METADATA)
+	@echo "Requires:	python3" >> $(METADATA)
 	@echo "Requires:	autofs" >> $(METADATA)
 	@echo "Requires:	bridge-utils" >> $(METADATA)
 	@echo "Requires:	expect" >> $(METADATA)
