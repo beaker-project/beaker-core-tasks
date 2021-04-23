@@ -23,6 +23,10 @@ define cpfile
 	restorecon -vv /usr/local/bin/$(1) ;
 endef
 
+define pyfile
+	mv py2/$(1) . ;
+endef
+
 BINFILES= guestcheck4down   \
 	guestcheck4up     \
 	guestgethostname  \
@@ -32,7 +36,6 @@ BINFILES= guestcheck4down   \
 	virshstopguest    \
 	wait4shutdown     \
 	wait4login        \
-	wait4guest        \
 	xmstopguest       \
 	xmstartguest      \
 	getguestnames.sh  \
@@ -45,26 +48,29 @@ BINFILES= guestcheck4down   \
 	filetopty.sh      \
 	ptytofile.sh      \
 	getconsolefile    \
-	get_guest_info.py \
-	get_guest_fqdn.py \
 	rhts_submit_virt_logs \
 	rhts_virt_funcs.sh    \
 	guest1cmd             \
-	scp.exp               \
-	zrhel5_write_consolelogs.py \
+	scp.exp
+
+PYFILES=get_guest_fqdn.py \
+	get_guest_info.py \
+	get_user_data.py \
 	lxml_guestname_resolution.py \
 	minidom_guestname_resolution.py \
-	wait4guesttasks
+	rhel5_write_consolelogs.py \
+	start_recipe.py \
+	wait4guest \
+	wait4guesttasks \
+	zrhel5_write_consolelogs.py
 
 FILES=	$(METADATA)       \
 	$(BINFILES)       \
+	py2/ \
+	py3/ \
 	runtest.sh        \
 	Makefile          \
 	virtinstall.exp   \
-	get_guest_info.py \
-	get_guest_fqdn.py \
-	get_user_data.py  \
-	start_recipe.py   \
 	logguestconsoles.c \
 	logguestconsoles.initd \
 	zrhel5_write_consolelogs.initd \
@@ -72,8 +78,12 @@ FILES=	$(METADATA)       \
 
 binsetup:
 	$(foreach f,$(BINFILES),$(call cpfile,$(f)))
+	$(foreach f,$(PYFILES),$(call cpfile,$(f)))
 
-run: binsetup
+pysetup:
+	$(foreach f,$(PYFILES),$(call pyfile,$(f)))
+
+run: pysetup binsetup
 	chmod a+x ./runtest.sh ./*.exp ./*.py 
 	./runtest.sh
 
