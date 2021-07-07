@@ -421,24 +421,36 @@ function setuprhel5_xmlrpcc()
 
 function rename_current_ifcfg_config()
 {
-    local cfg_file=/etc/sysconfig/network-scripts/ifcfg-$netdev
-    local ret=0
-    if [ -e "$cfg_file" ]; then
-        echo "Found $cfg_file, trying to rename" | tee -a $OUTPUTFILE
-        mv -vf $cfg_file /etc/sysconfig/network-scripts/Xifcfg-${netdev}.orig >> $OUTPUTFILE
-        ret=$?
+    if rlIsRHEL '>=9' ; then
+        local cfg_file=/etc/NetworkManager/system-connections/${netdev}.nmconnection
+        local ret=0
+        if [ -e "$cfg_file" ]; then
+            echo "Found $cfg_file, trying to rename" | tee -a $OUTPUTFILE
+            cp -vf $cfg_file /etc/NetworkManager/system-connections/X${netdev}.nmconnection.orig >> $OUTPUTFILE
+            ret=$?
+        else
+            ret=1
+        fi
     else
-        # Bug 845225 - interface name does not match ifcfg- config file name
-        echo "Could not find $cfg_file, searching for one based on MAC" | tee -a $OUTPUTFILE
-        local ifcfg_files=`grep -l "${mac}" /etc/sysconfig/network-scripts/ifcfg-*`
-        echo "Matching config files: $ifcfg_files" | tee -a $OUTPUTFILE
-        for cfg_file in $ifcfg_files; do
-            bn=`basename $cfg_file`
-            mv -vf $cfg_file /etc/sysconfig/network-scripts/X$bn.orig >> $OUTPUTFILE
-            if [ $? -ne 0 ]; then
-                ret=1
-            fi
-        done
+        local cfg_file=/etc/sysconfig/network-scripts/ifcfg-$netdev
+        local ret=0
+        if [ -e "$cfg_file" ]; then
+            echo "Found $cfg_file, trying to rename" | tee -a $OUTPUTFILE
+            mv -vf $cfg_file /etc/sysconfig/network-scripts/Xifcfg-${netdev}.orig >> $OUTPUTFILE
+            ret=$?
+        else
+            # Bug 845225 - interface name does not match ifcfg- config file name
+            echo "Could not find $cfg_file, searching for one based on MAC" | tee -a $OUTPUTFILE
+            local ifcfg_files=`grep -l "${mac}" /etc/sysconfig/network-scripts/ifcfg-*`
+            echo "Matching config files: $ifcfg_files" | tee -a $OUTPUTFILE
+            for cfg_file in $ifcfg_files; do
+                bn=`basename $cfg_file`
+                mv -vf $cfg_file /etc/sysconfig/network-scripts/X$bn.orig >> $OUTPUTFILE
+                if [ $? -ne 0 ]; then
+                    ret=1
+                fi
+            done
+        fi
     fi
     return $ret
 }
@@ -790,14 +802,22 @@ if [[ ${kvm_num} -gt 0 ]]; then
          report_result ${TEST}_networksetup FAIL 1
          exit 1
       fi
-      cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$netdev
+      if rlIsRHEL '>=9' ; then
+
+         nmcli conn mod $netdev master br1 slave-type bridge connection.autoconnect yes 802-3-ethernet.mac-address $mac
+         nmcli conn add type bridge con-name $brdev ifname $brdev
+         nmcli conn mod $brdev 802-3-ethernet.cloned-mac-address $mac ipv4.method auto ipv6.method auto connection.autoconnect yes bridge.forward-delay 2
+
+      else
+
+         cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$netdev
 DEVICE=$netdev
 ONBOOT=yes
 BRIDGE=$brdev
 HWADDR=$mac
 EOF
 
-      cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$brdev
+         cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$brdev
 DEVICE=$brdev
 BOOTPROTO=dhcp
 ONBOOT=yes
@@ -805,13 +825,14 @@ TYPE=Bridge
 DELAY=0
 MACADDR=$mac
 EOF
+      fi
 
       if rlIsRHEL '<7' ; then
          service NetworkManager stop
          chkconfig NetworkManager off
          chkconfig network on
          service network restart
-      else
+      elif rlIsRHEL '<9' ; then
          # Turn on NetworkManager which supports bridging on RHEL7
          systemctl start NetworkManager
          systemctl enable NetworkManager
@@ -831,9 +852,15 @@ EOF
             tries=$(( tries - 1 ))
          done
          if [ $connected -eq 0 ]; then
-            echo "Problem while restoring network on $brdev"
+           CB_TBD OFF echo "Problem while restoring network on $brdev"
             exit 1
          fi
+     else
+         # NetworkManager enabled by default
+         nmcli conn down $netdev
+         nmcli conn reload
+         nmcli conn up $netdev
+         nmcli conn up $brdev
       fi
 
       if [[ $? -ne 0 ]]; then
